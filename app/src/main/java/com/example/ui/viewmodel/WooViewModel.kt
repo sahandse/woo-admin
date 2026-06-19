@@ -427,6 +427,24 @@ class WooViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun addAdminUser(user: AdminUser) {
+        viewModelScope.launch {
+            repository.addAdminUser(user)
+        }
+    }
+
+    fun removeAdminUser(userId: Long) {
+        viewModelScope.launch {
+            repository.deleteAdminUser(userId)
+        }
+    }
+
+    fun toggleAdminUserActive(userId: Long, isActive: Boolean) {
+        viewModelScope.launch {
+            db.adminUserDao().updateAdminUserStatus(userId, isActive)
+        }
+    }
+
     suspend fun sendSmsToCustomer(phone: String, text: String): com.example.core.network.SmsResult {
         return repository.sendMeliPayamakSms(phone, text)
     }

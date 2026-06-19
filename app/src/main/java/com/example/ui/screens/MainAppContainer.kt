@@ -42,6 +42,8 @@ sealed class Screen {
     data class CustomerDetails(val customerId: Long) : Screen()
     object Activities : Screen()
     object Coupons : Screen()
+    object Reports : Screen()
+    object AdminUsers : Screen()
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -273,6 +275,8 @@ fun MainAppContainer(
                             viewModel = viewModel,
                             onNavigateToActivities = { activeScreen = Screen.Activities },
                             onNavigateToCoupons = { activeScreen = Screen.Coupons },
+                            onNavigateToReports = { activeScreen = Screen.Reports },
+                            onNavigateToAdminUsers = { activeScreen = Screen.AdminUsers },
                             onToggleDarkTheme = onToggleDarkTheme,
                             isDarkTheme = isDarkTheme
                         )
@@ -284,6 +288,14 @@ fun MainAppContainer(
 
                     is Screen.Coupons -> {
                         CouponsScreen(viewModel = viewModel, onBack = { activeScreen = Screen.Settings })
+                    }
+
+                    is Screen.Reports -> {
+                        ReportsScreen(viewModel = viewModel, onBack = { activeScreen = Screen.Settings })
+                    }
+
+                    is Screen.AdminUsers -> {
+                        AdminUsersScreen(viewModel = viewModel, onBack = { activeScreen = Screen.Settings })
                     }
                 }
             }

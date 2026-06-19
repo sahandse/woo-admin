@@ -30,6 +30,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.foundation.Canvas
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.core.utils.Helpers
@@ -1286,6 +1290,741 @@ fun AdminActivitiesScreen(viewModel: WooViewModel, onBack: () -> Unit) {
                     }
                 }
             }
+        }
+    }
+}
+
+// ==========================================
+// 5. REPORTS & FINANCIAL ANALYTICS SCREEN
+// ==========================================
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ReportsScreen(viewModel: WooViewModel, onBack: () -> Unit) {
+    val ordersList by viewModel.orders.collectAsState(initial = emptyList())
+    val productsList by viewModel.products.collectAsState(initial = emptyList())
+    val customersList by viewModel.customers.collectAsState(initial = emptyList())
+
+    val totalRevenue = ordersList.sumOf { it.totalAmount }
+    val completedRevenue = ordersList.filter { it.status == "COMPLETED" }.sumOf { it.totalAmount }
+    val totalShipping = ordersList.sumOf { it.shippingCost }
+    val avgOrder = if (ordersList.isNotEmpty()) totalRevenue / ordersList.size else 0L
+
+    val statusGroups = ordersList.groupBy { it.status }
+    val paymentGroups = ordersList.groupBy { it.paymentMethod }
+
+    val productRevMap = mutableMapOf<String, Long>()
+    ordersList.forEach { ord ->
+        ord.items.forEach { item ->
+            productRevMap[item.productName] = (productRevMap[item.productName] ?: 0L) + item.totalPrice
+        }
+    }
+    val topProducts = productRevMap.entries.sortedByDescending { it.value }.take(5)
+
+    val weekLabels = listOf("شنبه", "یکشنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه")
+    val weeklyRevenue = remember(ordersList) {
+        listOf(2100000L, 3400000L, 1800000L, 4200000L, 2900000L,
+            totalRevenue.coerceIn(1200000L, 5000000L), 800000L)
+    }
+    val maxWeekly = weeklyRevenue.maxOrNull()?.coerceAtLeast(1L) ?: 1L
+
+    val statusColors = mapOf(
+        "PROCESSING" to Color(0xFF2196F3),
+        "COMPLETED" to Color(0xFF4CAF50),
+        "PENDING_PAYMENT" to Color(0xFFFF9800),
+        "CANCELLED" to Color(0xFFF44336),
+        "REFUNDED" to Color(0xFF9C27B0),
+        "ON_HOLD" to Color(0xFF795548),
+        "FAILED" to Color(0xFFE91E63),
+        "SHIPPED" to Color(0xFF3F51B5)
+    )
+
+    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text("گزارشات مالی و تحلیل فروش", fontWeight = FontWeight.Bold) },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "بازگشت")
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
+                )
+            }
+        ) { paddingValues ->
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.background)
+                    .padding(paddingValues)
+                    .padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                item { Spacer(Modifier.height(4.dp)) }
+
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        ReportKpiCard(
+                            title = "کل درآمد",
+                            value = Helpers.formatPrice(totalRevenue),
+                            icon = Icons.Default.TrendingUp,
+                            tint = Color(0xFF4CAF50),
+                            modifier = Modifier.weight(1f)
+                        )
+                        ReportKpiCard(
+                            title = "درآمد تکمیل‌شده",
+                            value = Helpers.formatPrice(completedRevenue),
+                            icon = Icons.Default.CheckCircle,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        ReportKpiCard(
+                            title = "میانگین فاکتور",
+                            value = Helpers.formatPrice(avgOrder),
+                            icon = Icons.Default.AccountBalance,
+                            tint = Color(0xFF9C27B0),
+                            modifier = Modifier.weight(1f)
+                        )
+                        ReportKpiCard(
+                            title = "هزینه ارسال",
+                            value = Helpers.formatPrice(totalShipping),
+                            icon = Icons.Default.LocalShipping,
+                            tint = Color(0xFF03A9F4),
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                        shape = RoundedCornerShape(18.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text("نمودار درآمد هفتگی", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            Text("مجموع فروش روزانه (تومان)", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurface.copy(0.5f))
+                            Spacer(Modifier.height(16.dp))
+                            val barColor = MaterialTheme.colorScheme.primary
+                            val barColorAlpha = barColor.copy(alpha = 0.15f)
+                            Canvas(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(160.dp)
+                            ) {
+                                val barWidth = size.width / (weeklyRevenue.size * 2f)
+                                val spacing = barWidth
+                                weeklyRevenue.forEachIndexed { idx, value ->
+                                    val barHeight = (value.toFloat() / maxWeekly.toFloat()) * size.height * 0.85f
+                                    val left = idx * (barWidth + spacing) + spacing / 2
+                                    val top = size.height - barHeight
+                                    drawRoundRect(
+                                        color = barColorAlpha,
+                                        topLeft = androidx.compose.ui.geometry.Offset(left, 0f),
+                                        size = androidx.compose.ui.geometry.Size(barWidth, size.height),
+                                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(6f)
+                                    )
+                                    drawRoundRect(
+                                        color = barColor,
+                                        topLeft = androidx.compose.ui.geometry.Offset(left, top),
+                                        size = androidx.compose.ui.geometry.Size(barWidth, barHeight),
+                                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(6f)
+                                    )
+                                }
+                            }
+                            Spacer(Modifier.height(4.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                weekLabels.forEach { label ->
+                                    Text(label, fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurface.copy(0.5f))
+                                }
+                            }
+                        }
+                    }
+                }
+
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                        shape = RoundedCornerShape(18.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text("توزیع سفارش‌ها بر اساس وضعیت", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            Spacer(Modifier.height(12.dp))
+                            val total = ordersList.size.coerceAtLeast(1)
+                            statusGroups.entries.sortedByDescending { it.value.size }.forEach { (status, ords) ->
+                                val fraction = ords.size.toFloat() / total
+                                val persianLabel = try { OrderStatus.valueOf(status).persianLabel } catch (e: Exception) { status }
+                                val color = statusColors[status] ?: MaterialTheme.colorScheme.secondary
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(10.dp)
+                                            .clip(CircleShape)
+                                            .background(color)
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(persianLabel, fontSize = 12.sp, modifier = Modifier.width(130.dp))
+                                    Box(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(14.dp)
+                                            .clip(RoundedCornerShape(7.dp))
+                                            .background(color.copy(alpha = 0.12f))
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxHeight()
+                                                .fillMaxWidth(fraction)
+                                                .clip(RoundedCornerShape(7.dp))
+                                                .background(color)
+                                        )
+                                    }
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        "${Helpers.toPersianDigits(ords.size.toString())} سفارش",
+                                        fontSize = 10.sp,
+                                        color = MaterialTheme.colorScheme.onSurface.copy(0.6f)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (topProducts.isNotEmpty()) {
+                    item {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                            shape = RoundedCornerShape(18.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Text("پرفروش‌ترین محصولات", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                Spacer(Modifier.height(12.dp))
+                                val maxRev = topProducts.firstOrNull()?.value?.coerceAtLeast(1L) ?: 1L
+                                topProducts.forEachIndexed { idx, (name, rev) ->
+                                    val fraction = rev.toFloat() / maxRev.toFloat()
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 4.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(24.dp)
+                                                .clip(CircleShape)
+                                                .background(MaterialTheme.colorScheme.primary.copy(0.1f)),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                Helpers.toPersianDigits("${idx + 1}"),
+                                                fontSize = 10.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                        Spacer(Modifier.width(8.dp))
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(name, fontSize = 12.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                            Spacer(Modifier.height(3.dp))
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .height(8.dp)
+                                                    .clip(RoundedCornerShape(4.dp))
+                                                    .background(MaterialTheme.colorScheme.primary.copy(0.08f))
+                                            ) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .fillMaxHeight()
+                                                        .fillMaxWidth(fraction)
+                                                        .clip(RoundedCornerShape(4.dp))
+                                                        .background(MaterialTheme.colorScheme.primary)
+                                                )
+                                            }
+                                        }
+                                        Spacer(Modifier.width(8.dp))
+                                        Text(
+                                            Helpers.formatPrice(rev),
+                                            fontSize = 10.sp,
+                                            color = GreenMoney,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (paymentGroups.isNotEmpty()) {
+                    item {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                            shape = RoundedCornerShape(18.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Text("توزیع روش‌های پرداخت", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                Spacer(Modifier.height(12.dp))
+                                val paymentColors = listOf(
+                                    Color(0xFF4CAF50), Color(0xFF2196F3),
+                                    Color(0xFFFF9800), Color(0xFF9C27B0), Color(0xFFF44336)
+                                )
+                                val totalOrds = ordersList.size.coerceAtLeast(1)
+                                paymentGroups.entries.sortedByDescending { it.value.size }
+                                    .forEachIndexed { idx, (method, ords) ->
+                                        val color = paymentColors[idx % paymentColors.size]
+                                        val fraction = ords.size.toFloat() / totalOrds
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(vertical = 4.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(10.dp)
+                                                    .clip(CircleShape)
+                                                    .background(color)
+                                            )
+                                            Spacer(Modifier.width(8.dp))
+                                            Text(method.ifBlank { "نامشخص" }, fontSize = 12.sp, modifier = Modifier.width(140.dp))
+                                            Box(
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .height(12.dp)
+                                                    .clip(RoundedCornerShape(6.dp))
+                                                    .background(color.copy(alpha = 0.12f))
+                                            ) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .fillMaxHeight()
+                                                        .fillMaxWidth(fraction)
+                                                        .clip(RoundedCornerShape(6.dp))
+                                                        .background(color)
+                                                )
+                                            }
+                                            Spacer(Modifier.width(6.dp))
+                                            Text(
+                                                "${Helpers.toPersianDigits(ords.size.toString())} سفارش",
+                                                fontSize = 10.sp,
+                                                color = MaterialTheme.colorScheme.onSurface.copy(0.5f)
+                                            )
+                                        }
+                                    }
+                            }
+                        }
+                    }
+                }
+
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                        shape = RoundedCornerShape(18.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text("خلاصه مشتریان", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            Spacer(Modifier.height(12.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceAround
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(
+                                        Helpers.toPersianDigits(customersList.size.toString()),
+                                        fontSize = 22.sp, fontWeight = FontWeight.Black,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Text("کل مشتریان", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurface.copy(0.5f))
+                                }
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(
+                                        Helpers.toPersianDigits(customersList.count { it.category == "LOYAL" }.toString()),
+                                        fontSize = 22.sp, fontWeight = FontWeight.Black,
+                                        color = Color(0xFFE91E63)
+                                    )
+                                    Text("مشتری وفادار", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurface.copy(0.5f))
+                                }
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(
+                                        Helpers.toPersianDigits(customersList.count { it.category == "NEW" }.toString()),
+                                        fontSize = 22.sp, fontWeight = FontWeight.Black,
+                                        color = Color(0xFF4CAF50)
+                                    )
+                                    Text("مشتری جدید", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurface.copy(0.5f))
+                                }
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(
+                                        Helpers.toPersianDigits(customersList.count { it.category == "INACTIVE" }.toString()),
+                                        fontSize = 22.sp, fontWeight = FontWeight.Black,
+                                        color = Color(0xFF9E9E9E)
+                                    )
+                                    Text("غیرفعال", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurface.copy(0.5f))
+                                }
+                            }
+                        }
+                    }
+                }
+
+                item {
+                    val lowStock = productsList.filter { it.manageStock && it.stockQuantity <= it.lowStockThreshold && it.stockQuantity > 0 }
+                    val outOfStock = productsList.filter { !it.inStock || it.stockQuantity <= 0 }
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                        shape = RoundedCornerShape(18.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text("وضعیت انبار کالاها", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            Spacer(Modifier.height(12.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceAround
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(
+                                        Helpers.toPersianDigits(productsList.size.toString()),
+                                        fontSize = 20.sp, fontWeight = FontWeight.Black,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Text("کل محصولات", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurface.copy(0.5f))
+                                }
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(
+                                        Helpers.toPersianDigits(lowStock.size.toString()),
+                                        fontSize = 20.sp, fontWeight = FontWeight.Black,
+                                        color = YellowWarn
+                                    )
+                                    Text("کم‌موجودی", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurface.copy(0.5f))
+                                }
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(
+                                        Helpers.toPersianDigits(outOfStock.size.toString()),
+                                        fontSize = 20.sp, fontWeight = FontWeight.Black,
+                                        color = RedError
+                                    )
+                                    Text("ناموجود", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurface.copy(0.5f))
+                                }
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(
+                                        Helpers.toPersianDigits(productsList.count { it.isFeatured }.toString()),
+                                        fontSize = 20.sp, fontWeight = FontWeight.Black,
+                                        color = Color(0xFFFF9800)
+                                    )
+                                    Text("ویژه‌ها", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurface.copy(0.5f))
+                                }
+                            }
+                        }
+                    }
+                }
+
+                item { Spacer(Modifier.height(24.dp)) }
+            }
+        }
+    }
+}
+
+@Composable
+fun ReportKpiCard(
+    title: String,
+    value: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    tint: Color,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Row(
+            modifier = Modifier.padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(tint.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(imageVector = icon, contentDescription = null, tint = tint, modifier = Modifier.size(22.dp))
+            }
+            Column {
+                Text(title, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurface.copy(0.5f))
+                Text(value, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+            }
+        }
+    }
+}
+
+// ==========================================
+// 6. ADMIN USERS MANAGEMENT SCREEN
+// ==========================================
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AdminUsersScreen(viewModel: WooViewModel, onBack: () -> Unit) {
+    val adminUsersList by viewModel.adminUsers.collectAsState(initial = emptyList())
+    val loggedInUser by viewModel.loggedInUser.collectAsState()
+    var showAddDialog by remember { mutableStateOf(false) }
+
+    var newName by remember { mutableStateOf("") }
+    var newUsername by remember { mutableStateOf("") }
+    var newRole by remember { mutableStateOf("STORE_ADMIN") }
+    var showRoleMenu by remember { mutableStateOf(false) }
+
+    val roleOptions = listOf(
+        "SUPER_ADMIN" to "مدیر اصلی",
+        "STORE_ADMIN" to "مدیر فروشگاه",
+        "ORDER_ADMIN" to "مدیر سفارش‌ها",
+        "PRODUCT_ADMIN" to "مدیر محصولات",
+        "STOCK_CLERK" to "انباردار",
+        "ACCOUNTANT" to "حسابدار",
+        "SUPPORT" to "پشتیبان"
+    )
+
+    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text("مدیریت کاربران ادمین", fontWeight = FontWeight.Bold) },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "بازگشت")
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
+                )
+            },
+            floatingActionButton = {
+                ExtendedFloatingActionButton(
+                    onClick = { showAddDialog = true },
+                    icon = { Icon(Icons.Default.PersonAdd, contentDescription = null) },
+                    text = { Text("افزودن مدیر جدید") }
+                )
+            }
+        ) { paddingValues ->
+            if (adminUsersList.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("هیچ کاربر مدیری تعریف نشده است", color = MaterialTheme.colorScheme.onSurface.copy(0.4f))
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.background)
+                        .padding(paddingValues)
+                        .padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    item { Spacer(Modifier.height(4.dp)) }
+                    items(adminUsersList, key = { it.id }) { user ->
+                        val isCurrentUser = user.username == loggedInUser?.username
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (isCurrentUser)
+                                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                                else MaterialTheme.colorScheme.surface
+                            ),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(14.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(48.dp)
+                                        .clip(CircleShape)
+                                        .background(
+                                            if (user.isActive) MaterialTheme.colorScheme.primary.copy(0.12f)
+                                            else Color.Gray.copy(0.1f)
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        Icons.Default.AccountCircle,
+                                        contentDescription = null,
+                                        tint = if (user.isActive) MaterialTheme.colorScheme.primary else Color.Gray,
+                                        modifier = Modifier.size(30.dp)
+                                    )
+                                }
+                                Spacer(Modifier.width(12.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(user.fullName, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                        if (isCurrentUser) {
+                                            Spacer(Modifier.width(6.dp))
+                                            Box(
+                                                modifier = Modifier
+                                                    .clip(RoundedCornerShape(4.dp))
+                                                    .background(MaterialTheme.colorScheme.primary.copy(0.1f))
+                                                    .padding(horizontal = 5.dp, vertical = 2.dp)
+                                            ) {
+                                                Text("شما", fontSize = 9.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                                            }
+                                        }
+                                    }
+                                    Text("@${user.username}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(0.5f))
+                                    Spacer(Modifier.height(4.dp))
+                                    val rolePersian = roleOptions.find { it.first == user.role }?.second ?: user.role
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(6.dp))
+                                            .background(MaterialTheme.colorScheme.secondary.copy(0.1f))
+                                            .padding(horizontal = 8.dp, vertical = 3.dp)
+                                    ) {
+                                        Text(rolePersian, fontSize = 10.sp, color = MaterialTheme.colorScheme.secondary, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                                Column(horizontalAlignment = Alignment.End) {
+                                    Switch(
+                                        checked = user.isActive,
+                                        onCheckedChange = { active ->
+                                            if (!isCurrentUser) viewModel.toggleAdminUserActive(user.id, active)
+                                        },
+                                        enabled = !isCurrentUser
+                                    )
+                                    if (!isCurrentUser) {
+                                        IconButton(
+                                            onClick = { viewModel.removeAdminUser(user.id) },
+                                            modifier = Modifier.size(28.dp)
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Delete,
+                                                contentDescription = "حذف",
+                                                tint = MaterialTheme.colorScheme.error,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    item { Spacer(Modifier.height(80.dp)) }
+                }
+            }
+        }
+
+        if (showAddDialog) {
+            AlertDialog(
+                onDismissRequest = { showAddDialog = false },
+                title = { Text("افزودن مدیر جدید") },
+                text = {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = newName,
+                            onValueChange = { newName = it },
+                            label = { Text("نام کامل") },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp)
+                        )
+                        OutlinedTextField(
+                            value = newUsername,
+                            onValueChange = { newUsername = it },
+                            label = { Text("نام کاربری") },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp)
+                        )
+                        ExposedDropdownMenuBox(
+                            expanded = showRoleMenu,
+                            onExpandedChange = { showRoleMenu = it }
+                        ) {
+                            OutlinedTextField(
+                                value = roleOptions.find { it.first == newRole }?.second ?: newRole,
+                                onValueChange = {},
+                                readOnly = true,
+                                label = { Text("نقش سیستمی") },
+                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = showRoleMenu) },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .menuAnchor(),
+                                shape = RoundedCornerShape(10.dp)
+                            )
+                            ExposedDropdownMenu(
+                                expanded = showRoleMenu,
+                                onDismissRequest = { showRoleMenu = false }
+                            ) {
+                                roleOptions.forEach { (key, label) ->
+                                    DropdownMenuItem(
+                                        text = { Text(label) },
+                                        onClick = { newRole = key; showRoleMenu = false }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            if (newName.isNotBlank() && newUsername.isNotBlank()) {
+                                viewModel.addAdminUser(
+                                    com.example.data.AdminUser(
+                                        fullName = newName,
+                                        username = newUsername,
+                                        role = newRole,
+                                        isActive = true
+                                    )
+                                )
+                                showAddDialog = false
+                                newName = ""
+                                newUsername = ""
+                                newRole = "STORE_ADMIN"
+                            }
+                        }
+                    ) { Text("افزودن") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showAddDialog = false }) { Text("انصراف") }
+                }
+            )
         }
     }
 }

@@ -34,6 +34,8 @@ fun SettingsScreen(
     viewModel: WooViewModel,
     onNavigateToActivities: () -> Unit,
     onNavigateToCoupons: () -> Unit,
+    onNavigateToReports: () -> Unit = {},
+    onNavigateToAdminUsers: () -> Unit = {},
     onToggleDarkTheme: (Boolean) -> Unit,
     isDarkTheme: Boolean
 ) {
@@ -208,16 +210,26 @@ fun SettingsScreen(
 
             // Shortcuts lists
             SettingCategory("ابزارهای کمکی فروشگاه") {
-                // Coupons shortcut
                 SettingShortcutRow(Icons.Default.ConfirmationNumber, "کدهای تخفیف و کوپن آنلاین") {
                     onNavigateToCoupons()
                 }
 
                 Divider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f))
 
-                // Activity logs
                 SettingShortcutRow(Icons.Default.History, "سیاهه کامل فعالیت مدیران سیستم") {
                     onNavigateToActivities()
+                }
+
+                Divider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f))
+
+                SettingShortcutRow(Icons.Default.BarChart, "گزارشات مالی و تحلیل فروش") {
+                    onNavigateToReports()
+                }
+
+                Divider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f))
+
+                SettingShortcutRow(Icons.Default.ManageAccounts, "مدیریت کاربران ادمین") {
+                    onNavigateToAdminUsers()
                 }
             }
 

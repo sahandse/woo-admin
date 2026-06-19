@@ -7,62 +7,116 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Release version'
+        description: 'Release version (e.g. v1.1.0)'
         required: true
-        default: 'v1.0.0'
+        default: 'v1.1.0'
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        
-      - name: Set up JDK 11
-        uses: actions/setup-java@v3
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
         with:
-          java-version: '11'
+          java-version: '17'
           distribution: 'temurin'
           cache: gradle
-          
+
       - name: Create .env file
         run: |
-          echo "${{ secrets.ENV_FILE }}" > .env
-          
+          if [ -n "${{ secrets.ENV_FILE }}" ]; then
+            echo "${{ secrets.ENV_FILE }}" > .env
+          else
+            cp .env.example .env 2>/dev/null || echo "GEMINI_API_KEY=demo_key" > .env
+          fi
+
+      - name: Create debug keystore
+        run: |
+          keytool -genkey -v \
+            -keystore debug.keystore \
+            -alias androiddebugkey \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -storepass android \
+            -keypass android \
+            -dname "CN=Android Debug,O=Android,C=US"
+
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
-        
-      - name: Build Release APK
+
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug
+
+      - name: Build Release APK (signed)
+        if: ${{ secrets.STORE_PASSWORD != '' }}
         run: ./gradlew assembleRelease
         env:
           KEYSTORE_PATH: ${{ secrets.KEYSTORE_PATH }}
           STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-          
-      - name: Build Release AAB (Bundle)
+        continue-on-error: true
+
+      - name: Build Release AAB (signed)
+        if: ${{ secrets.STORE_PASSWORD != '' }}
         run: ./gradlew bundleRelease
         env:
           KEYSTORE_PATH: ${{ secrets.KEYSTORE_PATH }}
           STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-          
-      - name: Upload APK to Release
-        uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/')
+        continue-on-error: true
+
+      - name: Determine release tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create GitHub Release with Debug APK
+        uses: softprops/action-gh-release@v2
         with:
-          files: app/build/outputs/apk/release/*.apk
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: "مدیریت ووکامرس ${{ steps.tag.outputs.tag }}"
+          body: |
+            ## مدیریت ووکامرس - نسخه ${{ steps.tag.outputs.tag }}
+
+            ### ویژگی‌های این نسخه:
+            - **گزارشات مالی** – نمودار درآمد هفتگی، توزیع وضعیت سفارش‌ها، پرفروش‌ترین محصولات، روش‌های پرداخت، خلاصه انبار
+            - **مدیریت کاربران ادمین** – افزودن/حذف/غیرفعال کردن ادمین با نقش‌های مختلف (مدیر اصلی، انباردار، حسابدار و...)
+            - **داشبورد هوشمند** – کارت‌های KPI، نمودار تعاملی فروش روزانه با Canvas
+            - **مدیریت سفارش‌ها** – تغییر وضعیت، کد رهگیری، وضعیت ارسال، فاکتور، برچسب ارسال
+            - **مدیریت محصولات** – افزودن/ویرایش/حذف، کنترل موجودی، قیمت‌گذاری
+            - **مدیریت مشتریان** – دسته‌بندی هوشمند، یادداشت داخلی، ارسال پیامک
+            - **هوش مصنوعی Gemini** – تحلیل فروشگاه و پیشنهادات بهینه‌سازی
+            - **پیامک ملی‌پیامک** – ارسال خودکار پیامک وضعیت سفارش
+            - **کوپن‌ها** – ایجاد و مدیریت کدهای تخفیف
+            - **مدیریت چند فروشگاهی** – اتصال و مدیریت چندین فروشگاه ووکامرس
+            - **تم تاریک/روشن** و **رابط کاربری فارسی کامل**
+
+            ### نصب APK:
+            فایل `*-debug.apk` را دانلود کرده و روی گوشی اندروید نصب کنید.
+            (در صورت نیاز، «نصب از منابع ناشناس» را در تنظیمات امنیتی گوشی فعال کنید)
+          files: |
+            app/build/outputs/apk/debug/*.apk
           draft: false
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          
-      - name: Upload AAB to Release
-        uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/')
+
+      - name: Upload Signed Release APK
+        if: ${{ secrets.STORE_PASSWORD != '' }}
+        uses: softprops/action-gh-release@v2
         with:
-          files: app/build/outputs/bundle/release/*.aab
-          draft: false
-          prerelease: false
+          tag_name: ${{ steps.tag.outputs.tag }}
+          files: |
+            app/build/outputs/apk/release/*.apk
+            app/build/outputs/bundle/release/*.aab
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
