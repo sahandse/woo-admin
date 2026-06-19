@@ -26,6 +26,11 @@ jobs:
           distribution: 'temurin'
           cache: gradle
 
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: wrapper
+
       - name: Create .env file
         run: |
           cp .env.example .env 2>/dev/null || true
@@ -112,7 +117,7 @@ jobs:
       - name: Upload Signed Release APK (if available)
         run: |
           if ls app/build/outputs/apk/release/*.apk 1>/dev/null 2>&1; then
-            echo "Signed release APK found"
+            echo "Signed release APK found, would upload to release"
           else
-            echo "No signed release APK, skipping upload"
+            echo "No signed release APK (signing secrets not configured), skipping"
           fi
