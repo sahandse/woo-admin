@@ -45,7 +45,8 @@ import com.example.ui.viewmodel.WooViewModel
 fun ProductsScreen(
     viewModel: WooViewModel,
     onNavigateToAdd: () -> Unit,
-    onNavigateToEdit: (Long) -> Unit
+    onNavigateToEdit: (Long) -> Unit,
+    onNavigateToInventory: () -> Unit = {}
 ) {
     val productsList by viewModel.filteredProducts.collectAsState(initial = emptyList())
     val searchInput by viewModel.productSearchQuery.collectAsState()
@@ -123,6 +124,16 @@ fun ProductsScreen(
                         else 
                             MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                }
+
+                // Inventory management shortcut
+                IconButton(
+                    onClick = onNavigateToInventory,
+                    modifier = Modifier
+                        .size(52.dp)
+                        .background(MaterialTheme.colorScheme.secondary, RoundedCornerShape(12.dp))
+                ) {
+                    Icon(imageVector = Icons.Default.Inventory2, contentDescription = "مدیریت انبار", tint = Color.White)
                 }
 
                 // Add FAB shortcut

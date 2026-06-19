@@ -44,6 +44,8 @@ sealed class Screen {
     object Coupons : Screen()
     object Reports : Screen()
     object AdminUsers : Screen()
+    object CreateOrder : Screen()
+    object InventoryManagement : Screen()
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -223,7 +225,8 @@ fun MainAppContainer(
                             viewModel = viewModel,
                             onNavigateToDetails = { orderId ->
                                 activeScreen = Screen.OrderDetails(orderId)
-                            }
+                            },
+                            onNavigateToCreateOrder = { activeScreen = Screen.CreateOrder }
                         )
                     }
 
@@ -239,7 +242,8 @@ fun MainAppContainer(
                         ProductsScreen(
                             viewModel = viewModel,
                             onNavigateToAdd = { activeScreen = Screen.AddEditProduct(null) },
-                            onNavigateToEdit = { pId -> activeScreen = Screen.AddEditProduct(pId) }
+                            onNavigateToEdit = { pId -> activeScreen = Screen.AddEditProduct(pId) },
+                            onNavigateToInventory = { activeScreen = Screen.InventoryManagement }
                         )
                     }
 
@@ -296,6 +300,20 @@ fun MainAppContainer(
 
                     is Screen.AdminUsers -> {
                         AdminUsersScreen(viewModel = viewModel, onBack = { activeScreen = Screen.Settings })
+                    }
+
+                    is Screen.CreateOrder -> {
+                        CreateOrderScreen(
+                            viewModel = viewModel,
+                            onBack = { activeScreen = Screen.Orders }
+                        )
+                    }
+
+                    is Screen.InventoryManagement -> {
+                        InventoryManagementScreen(
+                            viewModel = viewModel,
+                            onBack = { activeScreen = Screen.Products }
+                        )
                     }
                 }
             }

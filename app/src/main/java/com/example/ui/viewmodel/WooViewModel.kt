@@ -522,6 +522,72 @@ class WooViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    // --- INTERNAL ORDER CREATION ---
+    fun createManualOrder(
+        items: List<Pair<WooProduct, Int>>,
+        customerName: String,
+        customerPhone: String,
+        customerAddress: String,
+        discount: Long,
+        paymentMethod: String,
+        note: String
+    ) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val timestamp = System.currentTimeMillis()
+            val today = JalaliCalendar.getTodayJalali().toString()
+            val time = JalaliCalendar.getCurrentTime()
+
+            val orderItems = items.map { (prod, qty) ->
+                val unitPrice = prod.salePrice.takeIf { it > 0 } ?: prod.regularPrice
+                OrderItem(
+                    productId = prod.id,
+                    productName = prod.name,
+                    quantity = qty,
+                    unitPrice = unitPrice,
+                    totalPrice = unitPrice * qty,
+                    image = prod.mainImage
+                )
+            }
+            val subtotal = orderItems.sumOf { it.totalPrice }
+            val total = (subtotal - discount).coerceAtLeast(0)
+            val isPaid = paymentMethod == "نقد" || paymentMethod == "کارت‌خوان"
+
+            val order = WooOrder(
+                id = -(timestamp % 1_000_000_000L),
+                orderNumber = "MAN-${timestamp % 100000}",
+                status = OrderStatus.PROCESSING.name,
+                createdAtJalali = today,
+                createdAtTime = time,
+                customerName = customerName,
+                customerPhone = customerPhone,
+                customerEmail = "",
+                billingAddress = customerAddress,
+                shippingAddress = customerAddress,
+                city = "",
+                province = "",
+                postalCode = "",
+                customerNote = note,
+                items = orderItems,
+                subtotal = subtotal,
+                discount = discount,
+                shippingCost = 0L,
+                totalAmount = total,
+                paymentMethod = paymentMethod,
+                isPaid = isPaid,
+                adminNotes = "سفارش داخلی ثبت‌شده از پنل مدیریت"
+            )
+
+            repository.createSimulatedOrder(order)
+
+            for ((prod, qty) in items) {
+                if (prod.manageStock) {
+                    val newQty = (prod.stockQuantity - qty).coerceAtLeast(0)
+                    repository.updateProductStock(prod.id, newQty, newQty > 0)
+                }
+            }
+        }
+    }
+
     // --- AI ANALYSIS ---
     fun runAiAnalysis(prompt: String) {
         viewModelScope.launch {

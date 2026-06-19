@@ -44,7 +44,8 @@ import com.example.ui.viewmodel.WooViewModel
 @Composable
 fun OrdersScreen(
     viewModel: WooViewModel,
-    onNavigateToDetails: (Long) -> Unit
+    onNavigateToDetails: (Long) -> Unit,
+    onNavigateToCreateOrder: () -> Unit = {}
 ) {
     val ordersList by viewModel.filteredOrders.collectAsState(initial = emptyList())
     val searchInput by viewModel.orderSearchQuery.collectAsState()
@@ -80,6 +81,20 @@ fun OrdersScreen(
                         focusedBorderColor = MaterialTheme.colorScheme.primary
                     )
                 )
+
+                // Create internal order shortcut
+                IconButton(
+                    onClick = onNavigateToCreateOrder,
+                    modifier = Modifier
+                        .size(52.dp)
+                        .background(MaterialTheme.colorScheme.secondary, RoundedCornerShape(12.dp))
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.AddShoppingCart,
+                        contentDescription = "ثبت سفارش داخلی",
+                        tint = Color.White
+                    )
+                }
 
                 // Quick Status filter triggers
                 var showFilterDialog by remember { mutableStateOf(false) }
