@@ -5,7 +5,9 @@ import androidx.compose.animation.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -1006,52 +1008,84 @@ fun AddEditProductScreen(
     val productsList by viewModel.products.collectAsState()
     val product = productId?.let { pId -> productsList.find { it.id == pId } }
 
+    // Product type: 0=Simple, 1=Variable
+    var productType by remember { mutableStateOf(if ((product?.colors?.isNotEmpty() == true) || (product?.sizes?.isNotEmpty() == true)) 1 else 0) }
+
+    // Basic info
     var name by remember { mutableStateOf(product?.name ?: "") }
     var sku by remember { mutableStateOf(product?.sku ?: "") }
-    var regularPrice by remember { mutableStateOf(product?.regularPrice?.toString() ?: "") }
-    var salePrice by remember { mutableStateOf(product?.salePrice?.takeIf { it > 0 }?.toString() ?: "") }
-    var stockQuantity by remember { mutableStateOf(product?.stockQuantity?.toString() ?: "") }
-    var lowThreshold by remember { mutableStateOf(product?.lowStockThreshold?.toString() ?: "3") }
-    var categories by remember { mutableStateOf(product?.categories ?: "") }
-    var tags by remember { mutableStateOf(product?.tags ?: "") }
     var shortDesc by remember { mutableStateOf(product?.shortDescription ?: "") }
     var desc by remember { mutableStateOf(product?.description ?: "") }
-    var warehouseNote by remember { mutableStateOf(product?.warehouseNote ?: "") }
-    var imageLink by remember { mutableStateOf(product?.mainImage ?: "") }
-    var imageUri by remember { mutableStateOf<Uri?>(null) }
-    var showUrlInput by remember { mutableStateOf(false) }
 
+    // Categories & Tags as chip lists
+    var categoryInput by remember { mutableStateOf("") }
+    var categoryList by remember { mutableStateOf(
+        product?.categories?.split(",")?.map { it.trim() }?.filter { it.isNotBlank() } ?: emptyList()
+    ) }
+    var tagInput by remember { mutableStateOf("") }
+    var tagList by remember { mutableStateOf(
+        product?.tags?.split(",")?.map { it.trim() }?.filter { it.isNotBlank() } ?: emptyList()
+    ) }
+
+    // Pricing
+    var regularPrice by remember { mutableStateOf(product?.regularPrice?.toString() ?: "") }
+    var hasSalePrice by remember { mutableStateOf((product?.salePrice ?: 0L) > 0L) }
+    var salePrice by remember { mutableStateOf(product?.salePrice?.takeIf { it > 0 }?.toString() ?: "") }
+
+    // Inventory
+    var stockQuantity by remember { mutableStateOf(product?.stockQuantity?.toString() ?: "0") }
+    var lowThreshold by remember { mutableStateOf(product?.lowStockThreshold?.toString() ?: "3") }
+    var warehouseNote by remember { mutableStateOf(product?.warehouseNote ?: "") }
+
+    // Shipping
     var length by remember { mutableStateOf(product?.length?.takeIf { it > 0 }?.toString() ?: "") }
     var width by remember { mutableStateOf(product?.width?.takeIf { it > 0 }?.toString() ?: "") }
     var height by remember { mutableStateOf(product?.height?.takeIf { it > 0 }?.toString() ?: "") }
     var weight by remember { mutableStateOf(product?.weight?.takeIf { it > 0 }?.toString() ?: "") }
 
+    // Toggles
     var isVirtual by remember { mutableStateOf(product?.isVirtual ?: false) }
     var isDownloadable by remember { mutableStateOf(product?.isDownloadable ?: false) }
+    var isFeatured by remember { mutableStateOf(product?.isFeatured ?: false) }
     var isPublish by remember { mutableStateOf(product?.status != "draft") }
 
+    // Images
+    var mainImageUrl by remember { mutableStateOf(product?.mainImage ?: "") }
+    var mainImageUri by remember { mutableStateOf<Uri?>(null) }
+    var showMainUrlInput by remember { mutableStateOf(false) }
+    var galleryUrls by remember { mutableStateOf<List<String>>(product?.galleryImages ?: emptyList()) }
+    var galleryUrlInput by remember { mutableStateOf("") }
+    var showGalleryUrlInput by remember { mutableStateOf(false) }
+
+    // Variable attributes
+    var colorInput by remember { mutableStateOf("") }
+    var colorList by remember { mutableStateOf<List<String>>(product?.colors ?: emptyList()) }
+    var sizeInput by remember { mutableStateOf("") }
+    var sizeList by remember { mutableStateOf<List<String>>(product?.sizes ?: emptyList()) }
+
     val context = LocalContext.current
+    val displayMainImage: Any? = mainImageUri ?: mainImageUrl.takeIf { it.isNotBlank() }
 
-    val imagePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri ->
-        uri?.let {
-            imageUri = it
-            imageLink = it.toString()
-            showUrlInput = false
-        }
+    val mainImagePickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        uri?.let { mainImageUri = it; mainImageUrl = it.toString(); showMainUrlInput = false }
     }
-
-    val displayImageModel: Any? = imageUri ?: imageLink.takeIf { it.isNotBlank() }
+    val galleryPickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        uri?.let { galleryUrls = galleryUrls + it.toString() }
+    }
 
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
         Scaffold(
             topBar = {
                 TopAppBar(
-                    title = { Text(if (product != null) "ویرایش: ${product.name}" else "افزودن محصول جدید") },
+                    title = {
+                        Text(
+                            if (product != null) "ویرایش محصول" else "محصول جدید",
+                            fontWeight = FontWeight.Bold
+                        )
+                    },
                     navigationIcon = {
                         IconButton(onClick = onBack) {
-                            Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "بازگشت")
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "بازگشت")
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
@@ -1060,62 +1094,69 @@ fun AddEditProductScreen(
             bottomBar = {
                 Surface(
                     tonalElevation = 8.dp,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .windowInsetsPadding(WindowInsets.navigationBars)
+                    modifier = Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.navigationBars)
                 ) {
-                    Box(modifier = Modifier.padding(16.dp)) {
-                        Button(
-                            onClick = {
-                                if (name.isBlank()) {
-                                    Toast.makeText(context, "نام محصول الزامی است.", Toast.LENGTH_SHORT).show()
-                                    return@Button
-                                }
-                                if (regularPrice.toLongOrNull() == null) {
-                                    Toast.makeText(context, "قیمت اصلی معتبر وارد کنید.", Toast.LENGTH_SHORT).show()
-                                    return@Button
-                                }
-                                val finalProduct = WooProduct(
-                                    id = product?.id ?: System.currentTimeMillis(),
-                                    name = name,
-                                    slug = name.replace(" ", "-"),
-                                    shortDescription = shortDesc,
-                                    description = desc,
-                                    regularPrice = regularPrice.toLongOrNull() ?: 0,
-                                    salePrice = salePrice.toLongOrNull() ?: 0,
-                                    sku = sku,
-                                    manageStock = true,
-                                    stockQuantity = stockQuantity.toIntOrNull() ?: 0,
-                                    inStock = (stockQuantity.toIntOrNull() ?: 0) > 0,
-                                    lowStockThreshold = lowThreshold.toIntOrNull() ?: 3,
-                                    weight = weight.toDoubleOrNull() ?: 0.0,
-                                    length = length.toDoubleOrNull() ?: 0.0,
-                                    width = width.toDoubleOrNull() ?: 0.0,
-                                    height = height.toDoubleOrNull() ?: 0.0,
-                                    categories = categories,
-                                    tags = tags,
-                                    mainImage = imageLink,
-                                    status = if (isPublish) "publish" else "draft",
-                                    isVirtual = isVirtual,
-                                    isDownloadable = isDownloadable,
-                                    warehouseNote = warehouseNote
-                                )
-                                if (product != null) {
-                                    viewModel.editProduct(finalProduct)
-                                    Toast.makeText(context, "تغییرات ذخیره شد.", Toast.LENGTH_SHORT).show()
-                                } else {
-                                    viewModel.addProduct(finalProduct)
-                                    Toast.makeText(context, "محصول جدید اضافه شد.", Toast.LENGTH_SHORT).show()
-                                }
-                                onBack()
-                            },
-                            modifier = Modifier.fillMaxWidth().height(52.dp),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Icon(imageVector = if (product != null) Icons.Filled.Save else Icons.Filled.Add, contentDescription = null)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(if (product != null) "ذخیره تغییرات" else "انتشار محصول", fontSize = 15.sp, fontWeight = FontWeight.Bold)
-                        }
+                    Button(
+                        onClick = {
+                            if (name.isBlank()) {
+                                Toast.makeText(context, "نام محصول الزامی است", Toast.LENGTH_SHORT).show()
+                                return@Button
+                            }
+                            if (regularPrice.toLongOrNull() == null) {
+                                Toast.makeText(context, "قیمت معتبر وارد کنید", Toast.LENGTH_SHORT).show()
+                                return@Button
+                            }
+                            val finalProduct = WooProduct(
+                                id = product?.id ?: System.currentTimeMillis(),
+                                name = name.trim(),
+                                slug = name.trim().replace(" ", "-"),
+                                shortDescription = shortDesc,
+                                description = desc,
+                                regularPrice = regularPrice.toLongOrNull() ?: 0,
+                                salePrice = if (hasSalePrice) salePrice.toLongOrNull() ?: 0 else 0,
+                                sku = sku,
+                                manageStock = true,
+                                stockQuantity = stockQuantity.toIntOrNull() ?: 0,
+                                inStock = (stockQuantity.toIntOrNull() ?: 0) > 0,
+                                lowStockThreshold = lowThreshold.toIntOrNull() ?: 3,
+                                weight = weight.toDoubleOrNull() ?: 0.0,
+                                length = length.toDoubleOrNull() ?: 0.0,
+                                width = width.toDoubleOrNull() ?: 0.0,
+                                height = height.toDoubleOrNull() ?: 0.0,
+                                categories = categoryList.joinToString(", "),
+                                tags = tagList.joinToString(", "),
+                                mainImage = mainImageUrl,
+                                galleryImages = galleryUrls,
+                                status = if (isPublish) "publish" else "draft",
+                                isVirtual = isVirtual,
+                                isDownloadable = isDownloadable,
+                                isFeatured = isFeatured,
+                                colors = colorList,
+                                sizes = sizeList,
+                                warehouseNote = warehouseNote
+                            )
+                            if (product != null) {
+                                viewModel.editProduct(finalProduct)
+                                Toast.makeText(context, "تغییرات ذخیره شد", Toast.LENGTH_SHORT).show()
+                            } else {
+                                viewModel.addProduct(finalProduct)
+                                Toast.makeText(context, "محصول اضافه شد", Toast.LENGTH_SHORT).show()
+                            }
+                            onBack()
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
+                            .height(52.dp),
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        Icon(if (product != null) Icons.Default.Save else Icons.Default.Add, null)
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            if (product != null) "ذخیره تغییرات" else "انتشار محصول",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp
+                        )
                     }
                 }
             }
@@ -1127,99 +1168,212 @@ fun AddEditProductScreen(
                     .verticalScroll(rememberScrollState())
             ) {
 
-                // ---- IMAGE SECTION ----
-                Box(
+                // ── PRODUCT TYPE SELECTOR ──
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(220.dp)
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    if (displayImageModel != null) {
-                        AsyncImage(
-                            model = displayImageModel,
-                            contentDescription = "تصویر محصول",
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize()
-                        )
+                    listOf("محصول ساده" to 0, "محصول متغیر" to 1).forEach { (label, idx) ->
+                        val selected = productType == idx
                         Box(
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .height(72.dp)
-                                .align(Alignment.BottomCenter)
-                                .background(Color.Black.copy(alpha = 0.45f))
-                        )
-                    } else {
-                        Column(
-                            modifier = Modifier.align(Alignment.Center),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                                .weight(1f)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant)
+                                .clickable { productType = idx }
+                                .padding(vertical = 12.dp),
+                            contentAlignment = Alignment.Center
                         ) {
-                            Icon(
-                                imageVector = Icons.Filled.AddPhotoAlternate,
-                                contentDescription = null,
-                                modifier = Modifier.size(60.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-                            )
                             Text(
-                                "تصویری انتخاب نشده",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
-                                fontSize = 13.sp
+                                label,
+                                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                color = if (selected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 14.sp
                             )
                         }
                     }
-
-                    Row(
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 10.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Button(
-                            onClick = { imagePickerLauncher.launch("image/*") },
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
-                        ) {
-                            Icon(imageVector = Icons.Filled.PhotoLibrary, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("انتخاب از گالری", fontSize = 12.sp)
-                        }
-                        OutlinedButton(
-                            onClick = { showUrlInput = !showUrlInput },
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
-                            colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.White.copy(alpha = 0.15f)),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.6f))
-                        ) {
-                            Icon(imageVector = Icons.Filled.Link, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.White)
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("آدرس URL", fontSize = 12.sp, color = Color.White)
-                        }
-                    }
                 }
 
-                AnimatedVisibility(visible = showUrlInput) {
-                    OutlinedTextField(
-                        value = imageLink,
-                        onValueChange = { imageLink = it; imageUri = null },
-                        label = { Text("آدرس URL تصویر") },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                        shape = RoundedCornerShape(10.dp),
-                        leadingIcon = { Icon(Icons.Filled.Link, contentDescription = null) },
-                        singleLine = true
-                    )
-                }
-
-                // ---- BASIC INFO ----
-                ProductSectionHeader(title = "اطلاعات اصلی محصول", icon = Icons.Filled.Edit)
+                // ── IMAGES ──
+                ProductSectionHeader("تصاویر محصول", Icons.Default.PhotoLibrary)
 
                 Column(
                     modifier = Modifier.padding(horizontal = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    // Main image
+                    Text("تصویر اصلی", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(190.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                    ) {
+                        if (displayMainImage != null) {
+                            AsyncImage(
+                                model = displayMainImage,
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        } else {
+                            Icon(
+                                Icons.Default.AddPhotoAlternate,
+                                null,
+                                modifier = Modifier
+                                    .align(Alignment.Center)
+                                    .size(52.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f)
+                            )
+                        }
+                        Row(
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .fillMaxWidth()
+                                .background(Color.Black.copy(alpha = 0.38f))
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            TextButton(
+                                onClick = { mainImagePickerLauncher.launch("image/*") },
+                                colors = ButtonDefaults.textButtonColors(contentColor = Color.White),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(Icons.Default.PhotoLibrary, null, modifier = Modifier.size(15.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("گالری", fontSize = 12.sp)
+                            }
+                            TextButton(
+                                onClick = { showMainUrlInput = !showMainUrlInput },
+                                colors = ButtonDefaults.textButtonColors(contentColor = Color.White),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(Icons.Default.Link, null, modifier = Modifier.size(15.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("URL", fontSize = 12.sp)
+                            }
+                            if (displayMainImage != null) {
+                                TextButton(
+                                    onClick = { mainImageUrl = ""; mainImageUri = null },
+                                    colors = ButtonDefaults.textButtonColors(contentColor = Color.White),
+                                ) {
+                                    Icon(Icons.Default.DeleteOutline, null, modifier = Modifier.size(15.dp))
+                                }
+                            }
+                        }
+                    }
+
+                    AnimatedVisibility(visible = showMainUrlInput) {
+                        OutlinedTextField(
+                            value = mainImageUrl,
+                            onValueChange = { mainImageUrl = it; mainImageUri = null },
+                            label = { Text("URL تصویر اصلی") },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp),
+                            singleLine = true,
+                            leadingIcon = { Icon(Icons.Default.Link, null, modifier = Modifier.size(18.dp)) }
+                        )
+                    }
+
+                    // Gallery
+                    Text("گالری تصاویر", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        itemsIndexed(galleryUrls) { index, url ->
+                            Box(modifier = Modifier.size(80.dp)) {
+                                AsyncImage(
+                                    model = url,
+                                    contentDescription = null,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .size(20.dp)
+                                        .align(Alignment.TopEnd)
+                                        .clip(CircleShape)
+                                        .background(Color.Black.copy(alpha = 0.55f))
+                                        .clickable { galleryUrls = galleryUrls.filterIndexed { i, _ -> i != index } },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Default.Close, null, tint = Color.White, modifier = Modifier.size(12.dp))
+                                }
+                            }
+                        }
+                        item {
+                            Column(
+                                modifier = Modifier
+                                    .size(80.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                                    .clickable { galleryPickerLauncher.launch("image/*") },
+                                verticalArrangement = Arrangement.Center,
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Icon(Icons.Default.Add, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp))
+                                Text("گالری", fontSize = 10.sp, color = MaterialTheme.colorScheme.primary)
+                            }
+                        }
+                        item {
+                            Column(
+                                modifier = Modifier
+                                    .size(80.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                                    .clickable { showGalleryUrlInput = !showGalleryUrlInput },
+                                verticalArrangement = Arrangement.Center,
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Icon(Icons.Default.Link, null, tint = MaterialTheme.colorScheme.secondary, modifier = Modifier.size(24.dp))
+                                Text("URL", fontSize = 10.sp, color = MaterialTheme.colorScheme.secondary)
+                            }
+                        }
+                    }
+
+                    AnimatedVisibility(visible = showGalleryUrlInput) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            OutlinedTextField(
+                                value = galleryUrlInput,
+                                onValueChange = { galleryUrlInput = it },
+                                label = { Text("URL تصویر گالری") },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(10.dp),
+                                singleLine = true
+                            )
+                            IconButton(
+                                onClick = {
+                                    if (galleryUrlInput.isNotBlank()) {
+                                        galleryUrls = galleryUrls + galleryUrlInput.trim()
+                                        galleryUrlInput = ""
+                                        showGalleryUrlInput = false
+                                    }
+                                },
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(10.dp))
+                            ) {
+                                Icon(Icons.Default.Add, null, tint = Color.White)
+                            }
+                        }
+                    }
+                }
+
+                // ── BASIC INFO ──
+                ProductSectionHeader("اطلاعات اصلی", Icons.Default.Edit)
+
+                Column(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     OutlinedTextField(
                         value = name,
@@ -1229,75 +1383,204 @@ fun AddEditProductScreen(
                         shape = RoundedCornerShape(10.dp),
                         singleLine = true
                     )
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                        OutlinedTextField(
-                            value = sku,
-                            onValueChange = { sku = it },
-                            label = { Text("SKU / کد انبار") },
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(10.dp),
-                            singleLine = true
-                        )
-                        OutlinedTextField(
-                            value = categories,
-                            onValueChange = { categories = it },
-                            label = { Text("دسته‌بندی") },
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(10.dp),
-                            singleLine = true
-                        )
-                    }
                     OutlinedTextField(
-                        value = tags,
-                        onValueChange = { tags = it },
-                        label = { Text("برچسب‌ها (با کاما جدا کنید)") },
+                        value = sku,
+                        onValueChange = { sku = it },
+                        label = { Text("کد SKU / کد انبار") },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(10.dp),
                         singleLine = true,
-                        leadingIcon = { Icon(Icons.Filled.LocalOffer, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                        leadingIcon = { Icon(Icons.Default.QrCodeScanner, null, modifier = Modifier.size(18.dp)) }
+                    )
+                    OutlinedTextField(
+                        value = shortDesc,
+                        onValueChange = { shortDesc = it },
+                        label = { Text("توضیح کوتاه") },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 2,
+                        maxLines = 3,
+                        shape = RoundedCornerShape(10.dp)
                     )
                 }
 
-                // ---- PRICING ----
-                ProductSectionHeader(title = "قیمت‌گذاری", icon = Icons.Filled.AttachMoney)
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    OutlinedTextField(
-                        value = regularPrice,
-                        onValueChange = { regularPrice = it },
-                        label = { Text("قیمت اصلی (تومان) *") },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(10.dp),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        singleLine = true
-                    )
-                    OutlinedTextField(
-                        value = salePrice,
-                        onValueChange = { salePrice = it },
-                        label = { Text("قیمت حراجی (تومان)") },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(10.dp),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        singleLine = true
-                    )
-                }
-
-                // ---- INVENTORY ----
-                ProductSectionHeader(title = "موجودی انبار", icon = Icons.Filled.Inventory)
+                // ── CATEGORIES ──
+                ProductSectionHeader("دسته‌بندی", Icons.Default.Category)
 
                 Column(
                     modifier = Modifier.padding(horizontal = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = categoryInput,
+                            onValueChange = { categoryInput = it },
+                            label = { Text("نام دسته‌بندی") },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(10.dp),
+                            singleLine = true
+                        )
+                        IconButton(
+                            onClick = {
+                                val v = categoryInput.trim()
+                                if (v.isNotBlank() && !categoryList.contains(v)) {
+                                    categoryList = categoryList + v
+                                    categoryInput = ""
+                                }
+                            },
+                            modifier = Modifier
+                                .size(48.dp)
+                                .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(10.dp))
+                        ) {
+                            Icon(Icons.Default.Add, null, tint = Color.White)
+                        }
+                    }
+                    if (categoryList.isNotEmpty()) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            categoryList.forEach { cat ->
+                                InputChip(
+                                    selected = false,
+                                    onClick = {},
+                                    label = { Text(cat, fontSize = 12.sp) },
+                                    trailingIcon = {
+                                        Icon(
+                                            Icons.Default.Close,
+                                            null,
+                                            modifier = Modifier
+                                                .size(14.dp)
+                                                .clickable { categoryList = categoryList.filter { it != cat } }
+                                        )
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // ── TAGS ──
+                ProductSectionHeader("برچسب‌ها", Icons.Default.LocalOffer)
+
+                Column(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = tagInput,
+                            onValueChange = { tagInput = it },
+                            label = { Text("برچسب جدید") },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(10.dp),
+                            singleLine = true,
+                            leadingIcon = { Icon(Icons.Default.LocalOffer, null, modifier = Modifier.size(16.dp)) }
+                        )
+                        IconButton(
+                            onClick = {
+                                val v = tagInput.trim()
+                                if (v.isNotBlank() && !tagList.contains(v)) {
+                                    tagList = tagList + v
+                                    tagInput = ""
+                                }
+                            },
+                            modifier = Modifier
+                                .size(48.dp)
+                                .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(10.dp))
+                        ) {
+                            Icon(Icons.Default.Add, null, tint = Color.White)
+                        }
+                    }
+                    if (tagList.isNotEmpty()) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            tagList.forEach { tag ->
+                                InputChip(
+                                    selected = false,
+                                    onClick = {},
+                                    label = { Text(tag, fontSize = 12.sp) },
+                                    trailingIcon = {
+                                        Icon(
+                                            Icons.Default.Close,
+                                            null,
+                                            modifier = Modifier
+                                                .size(14.dp)
+                                                .clickable { tagList = tagList.filter { it != tag } }
+                                        )
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // ── PRICING ──
+                ProductSectionHeader("قیمت‌گذاری", Icons.Default.AttachMoney)
+
+                Column(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    OutlinedTextField(
+                        value = regularPrice,
+                        onValueChange = { regularPrice = it.filter { c -> c.isDigit() } },
+                        label = { Text("قیمت اصلی (تومان) *") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
+                        leadingIcon = { Icon(Icons.Default.AttachMoney, null, modifier = Modifier.size(18.dp)) }
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("قیمت حراجی (تخفیف)", fontSize = 13.sp)
+                        Switch(checked = hasSalePrice, onCheckedChange = { hasSalePrice = it })
+                    }
+                    AnimatedVisibility(visible = hasSalePrice) {
+                        OutlinedTextField(
+                            value = salePrice,
+                            onValueChange = { salePrice = it.filter { c -> c.isDigit() } },
+                            label = { Text("قیمت با تخفیف (تومان)") },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true,
+                            leadingIcon = { Icon(Icons.Default.LocalOffer, null, modifier = Modifier.size(18.dp)) }
+                        )
+                    }
+                }
+
+                // ── INVENTORY ──
+                ProductSectionHeader("موجودی انبار", Icons.Default.Inventory)
+
+                Column(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
                         OutlinedTextField(
                             value = stockQuantity,
-                            onValueChange = { stockQuantity = it },
+                            onValueChange = { stockQuantity = it.filter { c -> c.isDigit() } },
                             label = { Text("موجودی فعلی") },
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(10.dp),
@@ -1306,7 +1589,7 @@ fun AddEditProductScreen(
                         )
                         OutlinedTextField(
                             value = lowThreshold,
-                            onValueChange = { lowThreshold = it },
+                            onValueChange = { lowThreshold = it.filter { c -> c.isDigit() } },
                             label = { Text("حد هشدار کمبود") },
                             modifier = Modifier.weight(1f),
                             shape = RoundedCornerShape(10.dp),
@@ -1317,111 +1600,262 @@ fun AddEditProductScreen(
                     OutlinedTextField(
                         value = warehouseNote,
                         onValueChange = { warehouseNote = it },
-                        label = { Text("موقعیت انبار (مثلاً قفسه B ردیف ۳)") },
+                        label = { Text("محل انبار (مثلاً قفسه B ردیف ۳)") },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(10.dp),
                         singleLine = true,
-                        leadingIcon = { Icon(Icons.Filled.LocationOn, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                        leadingIcon = { Icon(Icons.Default.LocationOn, null, modifier = Modifier.size(18.dp)) }
                     )
                 }
 
-                // ---- DIMENSIONS ----
-                ProductSectionHeader(title = "ابعاد و وزن (برای محاسبه هزینه پست)", icon = Icons.Filled.Straighten)
+                // ── SHIPPING DIMENSIONS (hidden for virtual) ──
+                AnimatedVisibility(visible = !isVirtual) {
+                    Column {
+                        ProductSectionHeader("ابعاد و وزن (ارسال)", Icons.Default.LocalShipping)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedTextField(
+                                value = length,
+                                onValueChange = { length = it.filter { c -> c.isDigit() || c == '.' } },
+                                label = { Text("طول cm", fontSize = 10.sp) },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(10.dp),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                singleLine = true
+                            )
+                            OutlinedTextField(
+                                value = width,
+                                onValueChange = { width = it.filter { c -> c.isDigit() || c == '.' } },
+                                label = { Text("عرض cm", fontSize = 10.sp) },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(10.dp),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                singleLine = true
+                            )
+                            OutlinedTextField(
+                                value = height,
+                                onValueChange = { height = it.filter { c -> c.isDigit() || c == '.' } },
+                                label = { Text("ارتفاع cm", fontSize = 10.sp) },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(10.dp),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                singleLine = true
+                            )
+                            OutlinedTextField(
+                                value = weight,
+                                onValueChange = { weight = it.filter { c -> c.isDigit() || c == '.' } },
+                                label = { Text("وزن g", fontSize = 10.sp) },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(10.dp),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                singleLine = true
+                            )
+                        }
+                    }
+                }
 
-                Row(
+                // ── PRODUCT OPTIONS ──
+                ProductSectionHeader("ویژگی‌ها و وضعیت", Icons.Default.Settings)
+
+                Column(modifier = Modifier.padding(horizontal = 8.dp)) {
+                    listOf(
+                        Pair(isVirtual, "محصول مجازی (بدون ارسال فیزیکی)"),
+                        Pair(isDownloadable, "محصول دانلودی"),
+                        Pair(isFeatured, "محصول ویژه (Featured)"),
+                        Pair(isPublish, "انتشار فوری")
+                    ).forEachIndexed { idx, (checked, label) ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(label, fontSize = 13.sp)
+                            Switch(
+                                checked = checked,
+                                onCheckedChange = { v ->
+                                    when (idx) {
+                                        0 -> isVirtual = v
+                                        1 -> isDownloadable = v
+                                        2 -> isFeatured = v
+                                        3 -> isPublish = v
+                                    }
+                                }
+                            )
+                        }
+                    }
+                }
+
+                // ── VARIABLE ATTRIBUTES ──
+                AnimatedVisibility(visible = productType == 1) {
+                    Column {
+                        ProductSectionHeader("ویژگی‌ها و تنوع", Icons.Default.Tune)
+
+                        Column(
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            // Colors attribute
+                            Text("رنگ‌ها", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                OutlinedTextField(
+                                    value = colorInput,
+                                    onValueChange = { colorInput = it },
+                                    label = { Text("رنگ جدید (مثلاً: قرمز)") },
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(10.dp),
+                                    singleLine = true
+                                )
+                                IconButton(
+                                    onClick = {
+                                        val v = colorInput.trim()
+                                        if (v.isNotBlank() && !colorList.contains(v)) {
+                                            colorList = colorList + v; colorInput = ""
+                                        }
+                                    },
+                                    modifier = Modifier
+                                        .size(48.dp)
+                                        .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(10.dp))
+                                ) {
+                                    Icon(Icons.Default.Add, null, tint = Color.White)
+                                }
+                            }
+                            if (colorList.isNotEmpty()) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    colorList.forEach { c ->
+                                        InputChip(
+                                            selected = false,
+                                            onClick = {},
+                                            label = { Text(c, fontSize = 12.sp) },
+                                            trailingIcon = {
+                                                Icon(
+                                                    Icons.Default.Close,
+                                                    null,
+                                                    modifier = Modifier
+                                                        .size(14.dp)
+                                                        .clickable { colorList = colorList.filter { it != c } }
+                                                )
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+
+                            HorizontalDivider()
+
+                            // Sizes attribute
+                            Text("سایزها", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                OutlinedTextField(
+                                    value = sizeInput,
+                                    onValueChange = { sizeInput = it },
+                                    label = { Text("سایز جدید (مثلاً: XL)") },
+                                    modifier = Modifier.weight(1f),
+                                    shape = RoundedCornerShape(10.dp),
+                                    singleLine = true
+                                )
+                                IconButton(
+                                    onClick = {
+                                        val v = sizeInput.trim()
+                                        if (v.isNotBlank() && !sizeList.contains(v)) {
+                                            sizeList = sizeList + v; sizeInput = ""
+                                        }
+                                    },
+                                    modifier = Modifier
+                                        .size(48.dp)
+                                        .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(10.dp))
+                                ) {
+                                    Icon(Icons.Default.Add, null, tint = Color.White)
+                                }
+                            }
+                            if (sizeList.isNotEmpty()) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    sizeList.forEach { s ->
+                                        InputChip(
+                                            selected = false,
+                                            onClick = {},
+                                            label = { Text(s, fontSize = 12.sp) },
+                                            trailingIcon = {
+                                                Icon(
+                                                    Icons.Default.Close,
+                                                    null,
+                                                    modifier = Modifier
+                                                        .size(14.dp)
+                                                        .clickable { sizeList = sizeList.filter { it != s } }
+                                                )
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+
+                            if (colorList.isNotEmpty() || sizeList.isNotEmpty()) {
+                                val combinations = when {
+                                    colorList.isNotEmpty() && sizeList.isNotEmpty() -> colorList.size * sizeList.size
+                                    else -> colorList.size + sizeList.size
+                                }
+                                Card(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)),
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(12.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(Icons.Default.Info, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                                        Spacer(Modifier.width(8.dp))
+                                        Text(
+                                            "$combinations ترکیب (variant) ایجاد خواهد شد",
+                                            fontSize = 12.sp,
+                                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // ── FULL DESCRIPTION ──
+                ProductSectionHeader("توضیحات کامل", Icons.Default.Description)
+
+                OutlinedTextField(
+                    value = desc,
+                    onValueChange = { desc = it },
+                    label = { Text("توضیحات محصول") },
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    OutlinedTextField(
-                        value = length,
-                        onValueChange = { length = it },
-                        label = { Text("طول", fontSize = 10.sp) },
-                        placeholder = { Text("cm", fontSize = 11.sp) },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(10.dp),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        singleLine = true
-                    )
-                    OutlinedTextField(
-                        value = width,
-                        onValueChange = { width = it },
-                        label = { Text("عرض", fontSize = 10.sp) },
-                        placeholder = { Text("cm", fontSize = 11.sp) },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(10.dp),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        singleLine = true
-                    )
-                    OutlinedTextField(
-                        value = height,
-                        onValueChange = { height = it },
-                        label = { Text("ارتفاع", fontSize = 10.sp) },
-                        placeholder = { Text("cm", fontSize = 11.sp) },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(10.dp),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        singleLine = true
-                    )
-                    OutlinedTextField(
-                        value = weight,
-                        onValueChange = { weight = it },
-                        label = { Text("وزن", fontSize = 10.sp) },
-                        placeholder = { Text("gr", fontSize = 11.sp) },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(10.dp),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        singleLine = true
-                    )
-                }
+                    minLines = 4,
+                    maxLines = 12,
+                    shape = RoundedCornerShape(10.dp)
+                )
 
-                // ---- PRODUCT TYPE ----
-                ProductSectionHeader(title = "نوع و وضعیت محصول", icon = Icons.Filled.Settings)
-
-                Column(modifier = Modifier.padding(horizontal = 8.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                        Checkbox(checked = isVirtual, onCheckedChange = { isVirtual = it })
-                        Text("محصول مجازی (بدون ارسال فیزیکی)", modifier = Modifier.weight(1f), fontSize = 13.sp)
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                        Checkbox(checked = isDownloadable, onCheckedChange = { isDownloadable = it })
-                        Text("محصول دانلودی", modifier = Modifier.weight(1f), fontSize = 13.sp)
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                        Checkbox(checked = isPublish, onCheckedChange = { isPublish = it })
-                        Text("انتشار فوری (وضعیت: منتشر شده)", modifier = Modifier.weight(1f), fontSize = 13.sp)
-                    }
-                }
-
-                // ---- DESCRIPTION ----
-                ProductSectionHeader(title = "توضیحات", icon = Icons.Filled.Description)
-
-                Column(
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    OutlinedTextField(
-                        value = shortDesc,
-                        onValueChange = { shortDesc = it },
-                        label = { Text("توضیح کوتاه") },
-                        modifier = Modifier.fillMaxWidth(),
-                        minLines = 2,
-                        maxLines = 4,
-                        shape = RoundedCornerShape(10.dp)
-                    )
-                    OutlinedTextField(
-                        value = desc,
-                        onValueChange = { desc = it },
-                        label = { Text("توضیحات کامل محصول") },
-                        modifier = Modifier.fillMaxWidth(),
-                        minLines = 4,
-                        maxLines = 12,
-                        shape = RoundedCornerShape(10.dp)
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(32.dp))
+                Spacer(Modifier.height(24.dp))
             }
         }
     }
