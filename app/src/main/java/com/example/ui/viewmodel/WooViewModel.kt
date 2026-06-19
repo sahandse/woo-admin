@@ -427,6 +427,10 @@ class WooViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    suspend fun sendSmsToCustomer(phone: String, text: String): com.example.core.network.SmsResult {
+        return repository.sendMeliPayamakSms(phone, text)
+    }
+
     // --- SECURE WOOCOMMERCE API CONNECTION ENGINE ---
     fun connectWooCommerceSecurely(
         storeName: String,

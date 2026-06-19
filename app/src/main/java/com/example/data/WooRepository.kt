@@ -13,6 +13,10 @@ class WooRepository(private val db: AppDatabase, private val context: Context) {
 
     private val sharedPrefs = context.getSharedPreferences("woo_preferences", Context.MODE_PRIVATE)
 
+    var isDarkThemeEnabled: Boolean
+        get() = sharedPrefs.getBoolean("is_dark_theme_enabled", true)
+        set(value) = sharedPrefs.edit().putBoolean("is_dark_theme_enabled", value).apply()
+
     // Demo Mode toggle: True by default so that they can see a fully populated professional app first.
     var isDemoMode: Boolean
         get() = sharedPrefs.getBoolean("is_demo_mode", true)
@@ -29,6 +33,39 @@ class WooRepository(private val db: AppDatabase, private val context: Context) {
     var backendUrl: String
         get() = sharedPrefs.getString("backend_url", "https://api.example.com") ?: "https://api.example.com"
         set(value) = sharedPrefs.edit().putString("backend_url", value).apply()
+
+    // --- MELIPAYAMAK SMS INTEGRATION ---
+    var melipayamakUsername: String
+        get() = sharedPrefs.getString("melipayamak_username", "") ?: ""
+        set(value) = sharedPrefs.edit().putString("melipayamak_username", value).apply()
+
+    var melipayamakPassword: String
+        get() = sharedPrefs.getString("melipayamak_password", "") ?: ""
+        set(value) = sharedPrefs.edit().putString("melipayamak_password", value).apply()
+
+    var melipayamakSender: String
+        get() = sharedPrefs.getString("melipayamak_sender", "500040001015") ?: "500040001015"
+        set(value) = sharedPrefs.edit().putString("melipayamak_sender", value).apply()
+
+    var smsNewOrderEnabled: Boolean
+        get() = sharedPrefs.getBoolean("sms_new_order_enabled", true)
+        set(value) = sharedPrefs.edit().putBoolean("sms_new_order_enabled", value).apply()
+
+    var smsStatusChangeEnabled: Boolean
+        get() = sharedPrefs.getBoolean("sms_status_change_enabled", true)
+        set(value) = sharedPrefs.edit().putBoolean("sms_status_change_enabled", value).apply()
+
+    var smsTemplateNewOrder: String
+        get() = sharedPrefs.getString("sms_template_new_order", "مشتری عزیز {name}، سفارش شما به شماره {order_id} با موفقیت ثبت شد.") ?: "مشتری عزیز {name}، سفارش شما به شماره {order_id} با موفقیت ثبت شد."
+        set(value) = sharedPrefs.edit().putString("sms_template_new_order", value).apply()
+
+    var smsTemplateStatusProcessing: String
+        get() = sharedPrefs.getString("sms_template_status_processing", "مشتری عزیز {name}، وضعیت سفارش {order_id} به \"در حال آماده‌سازی\" تغییر یافت.") ?: "مشتری عزیز {name}، وضعیت سفارش {order_id} به \"در حال آماده‌سازی\" تغییر یافت."
+        set(value) = sharedPrefs.edit().putString("sms_template_status_processing", value).apply()
+
+    var smsTemplateStatusCompleted: String
+        get() = sharedPrefs.getString("sms_template_status_completed", "مشتری عزیز {name}، سفارش {order_id} تکمیل و ارسال شد. با تشکر!") ?: "مشتری عزیز {name}، سفارش {order_id} تکمیل و ارسال شد. با تشکر!"
+        set(value) = sharedPrefs.edit().putString("sms_template_status_completed", value).apply()
 
     // Seeds the database with rich Persian details if they don't already exist
     suspend fun seedDatabase() = withContext(Dispatchers.IO) {
@@ -118,6 +155,28 @@ class WooRepository(private val db: AppDatabase, private val context: Context) {
     suspend fun changeOrderStatus(orderId: Long, status: OrderStatus) = withContext(Dispatchers.IO) {
         db.orderDao().updateOrderStatus(orderId, status.name)
         logActivity("CHANGE_STATUS", "وضعیت سفارش به شناسه $orderId را به «${status.persianLabel}» تغییر داد.")
+
+        // Send automatic SMS status notification if enabled
+        if (smsStatusChangeEnabled) {
+            val order = db.orderDao().getOrderById(orderId)
+            if (order != null && order.customerPhone.isNotBlank()) {
+                var textTemplate = ""
+                if (status == OrderStatus.PROCESSING) {
+                    textTemplate = smsTemplateStatusProcessing
+                } else if (status == OrderStatus.COMPLETED) {
+                    textTemplate = smsTemplateStatusCompleted
+                }
+
+                if (textTemplate.isNotBlank()) {
+                    val formattedMsg = textTemplate
+                        .replace("{name}", order.customerName)
+                        .replace("{order_id}", order.orderNumber)
+                        .replace("{amount}", Helpers.formatPrice(order.totalAmount))
+                    
+                    sendMeliPayamakSms(order.customerPhone, formattedMsg)
+                }
+            }
+        }
     }
 
     suspend fun changeOrderShippingStatus(orderId: Long, shippingStatus: String) = withContext(Dispatchers.IO) {
@@ -261,5 +320,28 @@ class WooRepository(private val db: AppDatabase, private val context: Context) {
                 timestampJalali = "$today - $time"
             )
         )
+    }
+
+    suspend fun sendMeliPayamakSms(recipientPhone: String, messageText: String): com.example.core.network.SmsResult = withContext(Dispatchers.IO) {
+        val username = melipayamakUsername
+        val password = melipayamakPassword
+        val sender = melipayamakSender
+
+        if (isDemoMode || username.isBlank() || password.isBlank()) {
+            val simulationMsg = "شبیه‌سازی ارسال پیامک به $recipientPhone: $messageText"
+            logActivity("SEND_SMS", "شبیه‌سازی ملی‌پیامک: ارسال پیامک به $recipientPhone انجام شد. (متن: $messageText)")
+            return@withContext com.example.core.network.SmsResult.Success("حالت آزمایشی فعال است. پیامک ارسال و ثبت شد.", simulationMsg)
+        }
+
+        val result = com.example.core.network.MeliPayamakService.sendSms(username, password, recipientPhone, sender, messageText)
+        when (result) {
+            is com.example.core.network.SmsResult.Success -> {
+                logActivity("SEND_SMS", "ملی‌پیامک - ارسال پیامک موفق به $recipientPhone. (متن: $messageText)")
+            }
+            is com.example.core.network.SmsResult.Error -> {
+                logActivity("SEND_SMS", "ملی‌پیامک - ارسال پیامک ناموفق به $recipientPhone. علت: ${result.errorMessage}")
+            }
+        }
+        result
     }
 }

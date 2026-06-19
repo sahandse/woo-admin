@@ -50,6 +50,14 @@ fun SettingsScreen(
     var newStoreKey by remember { mutableStateOf("") }
     var newStoreSecret by remember { mutableStateOf("") }
 
+    val repo = viewModel.repository
+    var meliUsername by remember { mutableStateOf(repo.melipayamakUsername) }
+    var meliPassword by remember { mutableStateOf(repo.melipayamakPassword) }
+    var meliSender by remember { mutableStateOf(repo.melipayamakSender) }
+    var smsStatusEnabled by remember { mutableStateOf(repo.smsStatusChangeEnabled) }
+    var templateProcessing by remember { mutableStateOf(repo.smsTemplateStatusProcessing) }
+    var templateCompleted by remember { mutableStateOf(repo.smsTemplateStatusCompleted) }
+
     val context = LocalContext.current
 
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
@@ -210,6 +218,101 @@ fun SettingsScreen(
                 // Activity logs
                 SettingShortcutRow(Icons.Default.History, "سیاهه کامل فعالیت مدیران سیستم") {
                     onNavigateToActivities()
+                }
+            }
+
+            // --- MELIPAYAMAK SETTINGS SECTION ---
+            SettingCategory("تنظیمات درگاه ملی‌پیامک (MeliPayamak)") {
+                OutlinedTextField(
+                    value = meliUsername,
+                    onValueChange = {
+                        meliUsername = it
+                        repo.melipayamakUsername = it
+                    },
+                    label = { Text("نام کاربری ملی‌پیامک") },
+                    placeholder = { Text("مثال: 09123456789") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp)
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                OutlinedTextField(
+                    value = meliPassword,
+                    onValueChange = {
+                        meliPassword = it
+                        repo.melipayamakPassword = it
+                    },
+                    label = { Text("کلمه عبور وب‌سرویس یا API Key") },
+                    placeholder = { Text("رمز عبور پنل پیامک شما") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp)
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                OutlinedTextField(
+                    value = meliSender,
+                    onValueChange = {
+                        meliSender = it
+                        repo.melipayamakSender = it
+                    },
+                    label = { Text("شماره فرستنده (خط اختصاصی/اشتراکی)") },
+                    placeholder = { Text("مثال: 500040001015") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp)
+                )
+
+                Divider(modifier = Modifier.padding(vertical = 12.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("ارسال خودکار زمان تغییر وضعیت سفارش", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        Text("ارسال مستقیم پیامکِ به‌روزرسانی زمان آماده‌سازی و قطعی شدن فاکتور", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
+                    }
+                    Switch(
+                        checked = smsStatusEnabled,
+                        onCheckedChange = {
+                            smsStatusEnabled = it
+                            repo.smsStatusChangeEnabled = it
+                        }
+                    )
+                }
+
+                if (smsStatusEnabled) {
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    OutlinedTextField(
+                        value = templateProcessing,
+                        onValueChange = {
+                            templateProcessing = it
+                            repo.smsTemplateStatusProcessing = it
+                        },
+                        label = { Text("قالب وضعیت: در حال آماده‌سازی (PROCESSING)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 2,
+                        shape = RoundedCornerShape(10.dp)
+                    )
+                    Text("متغیرها: {name} برای نام مشتری، {order_id} برای شماره فاکتور", fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f), modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp))
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    OutlinedTextField(
+                        value = templateCompleted,
+                        onValueChange = {
+                            templateCompleted = it
+                            repo.smsTemplateStatusCompleted = it
+                        },
+                        label = { Text("قالب وضعیت: تکمیل شده (COMPLETED)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 2,
+                        shape = RoundedCornerShape(10.dp)
+                    )
+                    Text("متغیرها: {name} برای نام، {order_id} برای شماره فاکتور، {amount} برای مبلغ نهایی فاکتور", fontSize = 9.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f), modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp))
                 }
             }
 

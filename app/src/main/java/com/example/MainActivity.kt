@@ -27,8 +27,8 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         setContent {
-            // High-fidelity dark mode toggle memorized inside container
-            var isDarkTheme by remember { mutableStateOf(true) }
+            // Persistent dark mode toggle loaded from preferences
+            var isDarkTheme by remember { mutableStateOf(viewModel.repository.isDarkThemeEnabled) }
 
             MyApplicationTheme(darkTheme = isDarkTheme) {
                 val isLoggedIn by viewModel.isLoggedIn.collectAsState()
@@ -39,7 +39,10 @@ class MainActivity : ComponentActivity() {
                             MainAppContainer(
                                 viewModel = viewModel,
                                 onLogout = { /* Handled in VM */ },
-                                onToggleDarkTheme = { isDarkTheme = it },
+                                onToggleDarkTheme = { 
+                                    isDarkTheme = it
+                                    viewModel.repository.isDarkThemeEnabled = it
+                                },
                                 isDarkTheme = isDarkTheme
                             )
                         } else {
