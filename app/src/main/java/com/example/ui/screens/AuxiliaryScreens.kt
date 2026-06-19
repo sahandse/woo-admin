@@ -5,6 +5,7 @@ import androidx.compose.animation.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
@@ -794,6 +795,76 @@ fun DashboardScreen(
                                         fontWeight = FontWeight.ExtraBold,
                                         color = secondaryColor
                                     )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Top 5 selling products
+            val topSellingProducts = remember(ordersList) {
+                ordersList.flatMap { it.items }
+                    .groupBy { it.productId }
+                    .map { (_, items) -> Pair(items.first().productName, items.sumOf { it.quantity }) }
+                    .sortedByDescending { it.second }
+                    .take(5)
+            }
+            if (topSellingProducts.isNotEmpty()) {
+                Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("پرفروش‌ترین محصولات", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Text("این هفته", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f))
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        items(topSellingProducts.size) { idx ->
+                            val (prodName, qty) = topSellingProducts[idx]
+                            val rankColors = listOf(Color(0xFFFFD700), Color(0xFFC0C0C0), Color(0xFFCD7F32), MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.secondary)
+                            val rankColor = rankColors.getOrElse(idx) { MaterialTheme.colorScheme.primary }
+                            Card(
+                                shape = RoundedCornerShape(16.dp),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                                modifier = Modifier.width(140.dp)
+                            ) {
+                                Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(32.dp)
+                                            .clip(CircleShape)
+                                            .background(rankColor.copy(alpha = 0.15f)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = "#${Helpers.toPersianDigits((idx + 1).toString())}",
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Black,
+                                            color = rankColor
+                                        )
+                                    }
+                                    Text(
+                                        text = prodName,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.ShoppingBag, null, modifier = Modifier.size(13.dp), tint = rankColor)
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = "${Helpers.toPersianDigits(qty.toString())} عدد فروش",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = rankColor
+                                        )
+                                    }
                                 }
                             }
                         }

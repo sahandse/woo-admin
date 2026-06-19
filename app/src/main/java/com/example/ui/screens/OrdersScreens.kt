@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.horizontalScroll
@@ -50,13 +51,19 @@ fun OrdersScreen(
     val ordersList by viewModel.filteredOrders.collectAsState(initial = emptyList())
     val searchInput by viewModel.orderSearchQuery.collectAsState()
     val statusFilter by viewModel.orderStatusFilter.collectAsState()
+    val context = LocalContext.current
+
+    var bulkMode by remember { mutableStateOf(false) }
+    var selectedOrders by remember { mutableStateOf(setOf<Long>()) }
+    var showBulkStatusDialog by remember { mutableStateOf(false) }
 
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
-        ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.background)
+            ) {
             // Search & Filter Header block
             Row(
                 modifier = Modifier
@@ -93,6 +100,26 @@ fun OrdersScreen(
                         imageVector = Icons.Default.AddShoppingCart,
                         contentDescription = "ثبت سفارش داخلی",
                         tint = Color.White
+                    )
+                }
+
+                // Bulk mode toggle
+                IconButton(
+                    onClick = {
+                        bulkMode = !bulkMode
+                        if (!bulkMode) selectedOrders = emptySet()
+                    },
+                    modifier = Modifier
+                        .size(52.dp)
+                        .background(
+                            if (bulkMode) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.surfaceVariant,
+                            RoundedCornerShape(12.dp)
+                        )
+                ) {
+                    Icon(
+                        imageVector = if (bulkMode) Icons.Default.CheckBox else Icons.Default.CheckBoxOutlineBlank,
+                        contentDescription = "انتخاب انبوه",
+                        tint = if (bulkMode) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
@@ -198,19 +225,108 @@ fun OrdersScreen(
                     modifier = Modifier
                         .weight(1f)
                         .padding(horizontal = 16.dp),
+                    contentPadding = PaddingValues(bottom = if (selectedOrders.isNotEmpty()) 80.dp else 12.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     items(ordersList, key = { it.id }) { item ->
-                        OrderCard(order = item, onClick = { onNavigateToDetails(item.id) })
+                        OrderCard(
+                            order = item,
+                            onClick = {
+                                if (bulkMode) {
+                                    selectedOrders = if (item.id in selectedOrders)
+                                        selectedOrders - item.id
+                                    else
+                                        selectedOrders + item.id
+                                } else {
+                                    onNavigateToDetails(item.id)
+                                }
+                            },
+                            isSelected = item.id in selectedOrders,
+                            showCheckbox = bulkMode
+                        )
                     }
                 }
             }
+            } // end inner Column
+
+            // Bulk action bottom bar
+            AnimatedVisibility(
+                visible = selectedOrders.isNotEmpty(),
+                enter = slideInVertically { it } + fadeIn(),
+                exit = slideOutVertically { it } + fadeOut(),
+                modifier = Modifier.align(Alignment.BottomCenter)
+            ) {
+                Surface(
+                    tonalElevation = 12.dp,
+                    modifier = Modifier.fillMaxWidth(),
+                    color = MaterialTheme.colorScheme.primary
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            "${Helpers.toPersianDigits(selectedOrders.size.toString())} سفارش انتخاب شده",
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(
+                                onClick = { showBulkStatusDialog = true },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = MaterialTheme.colorScheme.primary),
+                                shape = RoundedCornerShape(10.dp),
+                                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
+                            ) {
+                                Icon(Icons.Default.SwapHoriz, null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("تغییر وضعیت", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+                            IconButton(onClick = { selectedOrders = emptySet(); bulkMode = false }) {
+                                Icon(Icons.Default.Close, null, tint = Color.White)
+                            }
+                        }
+                    }
+                }
+            }
+        } // end Box
+
+        // Bulk status change dialog
+        if (showBulkStatusDialog) {
+            AlertDialog(
+                onDismissRequest = { showBulkStatusDialog = false },
+                title = { Text("تغییر وضعیت انبوه") },
+                text = {
+                    Column(modifier = Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        OrderStatus.values().forEach { os ->
+                            Button(
+                                onClick = {
+                                    viewModel.bulkUpdateOrderStatus(selectedOrders, os)
+                                    Toast.makeText(context, "${selectedOrders.size} سفارش به ${os.persianLabel} تغییر یافت", Toast.LENGTH_SHORT).show()
+                                    selectedOrders = emptySet()
+                                    bulkMode = false
+                                    showBulkStatusDialog = false
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(android.graphics.Color.parseColor(os.colorHex)).copy(alpha = 0.85f)),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Text(os.persianLabel, color = Color.White, fontSize = 13.sp)
+                            }
+                        }
+                    }
+                },
+                confirmButton = { TextButton(onClick = { showBulkStatusDialog = false }) { Text("انصراف") } }
+            )
         }
     }
 }
 
 @Composable
-fun OrderCard(order: WooOrder, onClick: () -> Unit) {
+fun OrderCard(order: WooOrder, onClick: () -> Unit, isSelected: Boolean = false, showCheckbox: Boolean = false) {
     val osEnum = OrderStatus.values().find { it.name == order.status } ?: OrderStatus.NEEDS_FOLLOWUP
     val statusColor = Color(android.graphics.Color.parseColor(osEnum.colorHex))
 
@@ -219,7 +335,11 @@ fun OrderCard(order: WooOrder, onClick: () -> Unit) {
             .fillMaxWidth()
             .clickable { onClick() },
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+                             else MaterialTheme.colorScheme.surface
+        ),
+        border = if (isSelected) androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else null,
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -230,6 +350,14 @@ fun OrderCard(order: WooOrder, onClick: () -> Unit) {
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (showCheckbox) {
+                        Checkbox(
+                            checked = isSelected,
+                            onCheckedChange = { onClick() },
+                            modifier = Modifier.size(20.dp).padding(end = 4.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                    }
                     Text(
                         text = order.orderNumber,
                         fontWeight = FontWeight.Bold,
@@ -422,6 +550,28 @@ fun OrderDetailsScreen(
                         navigationIcon = {
                             IconButton(onClick = onBack) {
                                 Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "بازگشت")
+                            }
+                        },
+                        actions = {
+                            IconButton(onClick = {
+                                val shareText = buildString {
+                                    appendLine("سفارش ${order.orderNumber}")
+                                    appendLine("مشتری: ${order.customerName}")
+                                    appendLine("تلفن: ${order.customerPhone}")
+                                    appendLine("وضعیت: ${OrderStatus.values().find { it.name == order.status }?.persianLabel ?: order.status}")
+                                    appendLine("مبلغ: ${Helpers.formatPrice(order.totalAmount)}")
+                                    if (order.trackingCode.isNotBlank()) {
+                                        appendLine("کد رهگیری: ${order.trackingCode}")
+                                        appendLine("شرکت حمل: ${order.shippingCompany}")
+                                    }
+                                }
+                                val intent = Intent(Intent.ACTION_SEND).apply {
+                                    type = "text/plain"
+                                    putExtra(Intent.EXTRA_TEXT, shareText)
+                                }
+                                context.startActivity(Intent.createChooser(intent, "ارسال اطلاعات سفارش"))
+                            }) {
+                                Icon(Icons.Default.Share, contentDescription = "اشتراک‌گذاری")
                             }
                         },
                         colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
@@ -632,6 +782,72 @@ fun OrderDetailsScreen(
                                             fontWeight = FontWeight.Bold,
                                             color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
                                         )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Status Timeline Card
+                    Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text("تایم‌لاین مسیر سفارش", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            Spacer(modifier = Modifier.height(12.dp))
+                            val timelineSteps = listOf(
+                                OrderStatus.PENDING_PAYMENT to "در انتظار پرداخت",
+                                OrderStatus.PROCESSING to "در حال پردازش",
+                                OrderStatus.READY_TO_SHIP to "آماده ارسال",
+                                OrderStatus.SHIPPED to "ارسال شده",
+                                OrderStatus.COMPLETED to "تکمیل شده"
+                            )
+                            val currentStepIdx = timelineSteps.indexOfFirst { it.first.name == order.status }.let {
+                                if (it == -1 && order.status == OrderStatus.CANCELLED.name) -2 else it
+                            }
+                            timelineSteps.forEachIndexed { idx, (status, label) ->
+                                val isDone = currentStepIdx >= 0 && idx < currentStepIdx
+                                val isCurrent = currentStepIdx >= 0 && idx == currentStepIdx
+                                val stepColor = Color(android.graphics.Color.parseColor(status.colorHex))
+                                val circleColor = when {
+                                    isCurrent -> stepColor
+                                    isDone -> GreenMoney
+                                    else -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
+                                }
+                                Row(verticalAlignment = Alignment.Top) {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(28.dp)
+                                                .clip(CircleShape)
+                                                .background(circleColor.copy(alpha = if (isCurrent) 1f else 0.15f))
+                                                .border(2.dp, circleColor, CircleShape),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            if (isDone) {
+                                                Icon(Icons.Default.Check, null, modifier = Modifier.size(14.dp), tint = GreenMoney)
+                                            } else {
+                                                Text(
+                                                    text = Helpers.toPersianDigits((idx + 1).toString()),
+                                                    fontSize = 11.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = if (isCurrent) Color.White else circleColor
+                                                )
+                                            }
+                                        }
+                                        if (idx < timelineSteps.lastIndex) {
+                                            Box(modifier = Modifier.width(2.dp).height(24.dp).background(if (isDone) GreenMoney else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)))
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Column(modifier = Modifier.padding(top = 4.dp, bottom = 8.dp)) {
+                                        Text(
+                                            text = label,
+                                            fontSize = 12.sp,
+                                            fontWeight = if (isCurrent) FontWeight.ExtraBold else FontWeight.Medium,
+                                            color = if (isCurrent) stepColor else MaterialTheme.colorScheme.onSurface.copy(alpha = if (isDone) 0.7f else 0.35f)
+                                        )
+                                        if (isCurrent) {
+                                            Text("وضعیت فعلی", fontSize = 9.sp, color = stepColor.copy(alpha = 0.7f), fontWeight = FontWeight.Bold)
+                                        }
                                     }
                                 }
                             }

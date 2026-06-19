@@ -381,6 +381,36 @@ class WooViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { repository.updateProduct(product) }
     }
 
+    fun cloneProduct(product: WooProduct) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val timestamp = System.currentTimeMillis()
+            val cloned = product.copy(
+                id = -(timestamp % 1_000_000_000L),
+                name = "کپی از ${product.name}",
+                sku = if (product.sku.isNotBlank()) "COPY-${product.sku.take(18)}" else "",
+                status = "draft"
+            )
+            repository.createProduct(cloned)
+        }
+    }
+
+    fun bulkUpdateProductPrice(productIds: Set<Long>, percentChange: Int) {
+        viewModelScope.launch(Dispatchers.IO) {
+            products.value.filter { it.id in productIds }.forEach { prod ->
+                val factor = 1.0 + percentChange / 100.0
+                val newRegular = (prod.regularPrice * factor).toLong().coerceAtLeast(1)
+                val newSale = if (prod.salePrice > 0) (prod.salePrice * factor).toLong().coerceAtLeast(0) else 0L
+                repository.updateProductPrice(prod.id, newRegular, newSale)
+            }
+        }
+    }
+
+    fun bulkUpdateOrderStatus(orderIds: Set<Long>, status: OrderStatus) {
+        viewModelScope.launch {
+            orderIds.forEach { id -> repository.changeOrderStatus(id, status) }
+        }
+    }
+
     // --- CUSTOMER OPERATIONS ---
     fun addCustomerNotes(customerId: Long, notes: String) {
         viewModelScope.launch { repository.insertCustomerInternalNotes(customerId, notes) }

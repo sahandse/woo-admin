@@ -58,6 +58,7 @@ fun MainAppContainer(
 ) {
     var activeScreen by remember { mutableStateOf<Screen>(Screen.Dashboard) }
     var showNotifSheet by remember { mutableStateOf(false) }
+    var fabExpanded by remember { mutableStateOf(false) }
 
     val notificationsList by viewModel.notifications.collectAsState(initial = emptyList())
     val unreadNotifs = notificationsList.count { !it.isRead }
@@ -138,6 +139,80 @@ fun MainAppContainer(
                         },
                         colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
                     )
+                }
+            },
+            floatingActionButton = {
+                val isTab = activeScreen is Screen.Dashboard ||
+                            activeScreen is Screen.Orders ||
+                            activeScreen is Screen.Products ||
+                            activeScreen is Screen.Customers ||
+                            activeScreen is Screen.AiAnalyst
+                if (isTab) {
+                    Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        AnimatedVisibility(
+                            visible = fabExpanded,
+                            enter = fadeIn() + slideInVertically { it },
+                            exit = fadeOut() + slideOutVertically { it }
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.End,
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                // ثبت سفارش داخلی
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(MaterialTheme.colorScheme.surface)
+                                            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
+                                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                                    ) { Text("ثبت سفارش داخلی", fontSize = 12.sp, fontWeight = FontWeight.Bold) }
+                                    SmallFloatingActionButton(
+                                        onClick = { fabExpanded = false; activeScreen = Screen.CreateOrder },
+                                        containerColor = MaterialTheme.colorScheme.secondary
+                                    ) { Icon(Icons.Default.AddShoppingCart, null) }
+                                }
+                                // افزودن محصول
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(MaterialTheme.colorScheme.surface)
+                                            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
+                                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                                    ) { Text("افزودن محصول", fontSize = 12.sp, fontWeight = FontWeight.Bold) }
+                                    SmallFloatingActionButton(
+                                        onClick = { fabExpanded = false; activeScreen = Screen.AddEditProduct(null) },
+                                        containerColor = MaterialTheme.colorScheme.tertiary
+                                    ) { Icon(Icons.Default.AddBox, null) }
+                                }
+                                // اسکن بارکد
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(MaterialTheme.colorScheme.surface)
+                                            .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
+                                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                                    ) { Text("جستجوی بارکد محصول", fontSize = 12.sp, fontWeight = FontWeight.Bold) }
+                                    SmallFloatingActionButton(
+                                        onClick = { fabExpanded = false; activeScreen = Screen.Products },
+                                        containerColor = MaterialTheme.colorScheme.primaryContainer
+                                    ) { Icon(Icons.Default.QrCodeScanner, null, tint = MaterialTheme.colorScheme.onPrimaryContainer) }
+                                }
+                            }
+                        }
+
+                        FloatingActionButton(
+                            onClick = { fabExpanded = !fabExpanded },
+                            containerColor = if (fabExpanded) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                        ) {
+                            Icon(
+                                imageVector = if (fabExpanded) Icons.Default.Close else Icons.Default.Add,
+                                contentDescription = "منوی سریع"
+                            )
+                        }
+                    }
                 }
             },
             bottomBar = {

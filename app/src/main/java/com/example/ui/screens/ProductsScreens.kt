@@ -64,9 +64,25 @@ fun ProductsScreen(
     var regularPriceInput by remember { mutableStateOf("") }
     var salePriceInput by remember { mutableStateOf("") }
 
+    // Bulk price mode
+    var bulkPriceMode by remember { mutableStateOf(false) }
+    var selectedProducts by remember { mutableStateOf(setOf<Long>()) }
+    var bulkPercentInput by remember { mutableStateOf("") }
+    var showBulkPriceConfirm by remember { mutableStateOf(false) }
+
+    // Barcode scan
+    var showBarcodeFallback by remember { mutableStateOf(false) }
+    var barcodeManualInput by remember { mutableStateOf("") }
+    val barcodeLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        result.data?.getStringExtra("SCAN_RESULT")?.let { viewModel.updateProductSearch(it) }
+    }
+
     val context = LocalContext.current
 
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+        Box(modifier = Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -96,6 +112,43 @@ fun ProductsScreen(
                         focusedBorderColor = MaterialTheme.colorScheme.primary
                     )
                 )
+
+                // Barcode scan icon
+                IconButton(
+                    onClick = {
+                        try {
+                            val intent = android.content.Intent("com.google.zxing.client.android.SCAN")
+                            barcodeLauncher.launch(intent)
+                        } catch (e: Exception) {
+                            showBarcodeFallback = true
+                        }
+                    },
+                    modifier = Modifier
+                        .size(52.dp)
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
+                ) {
+                    Icon(imageVector = Icons.Default.QrCodeScanner, contentDescription = "اسکن بارکد", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+
+                // Bulk price mode toggle
+                IconButton(
+                    onClick = {
+                        bulkPriceMode = !bulkPriceMode
+                        if (!bulkPriceMode) selectedProducts = emptySet()
+                    },
+                    modifier = Modifier
+                        .size(52.dp)
+                        .background(
+                            if (bulkPriceMode) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                            RoundedCornerShape(12.dp)
+                        )
+                ) {
+                    Icon(
+                        imageVector = if (bulkPriceMode) Icons.Default.PriceChange else Icons.Default.Percent,
+                        contentDescription = "مدیریت انبوه قیمت",
+                        tint = if (bulkPriceMode) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
 
                 // Advanced Filter icon button
                 IconButton(
@@ -434,11 +487,117 @@ fun ProductsScreen(
                             onStockChange = {
                                 showQuickStockDialog = product
                                 stockInput = product.stockQuantity.toString()
+                            },
+                            onClone = { viewModel.cloneProduct(product); Toast.makeText(context, "پیش‌نویس کپی ایجاد شد", Toast.LENGTH_SHORT).show() },
+                            onIncrementStock = { viewModel.updateProductStock(product.id, product.stockQuantity + 1) },
+                            onDecrementStock = { viewModel.updateProductStock(product.id, (product.stockQuantity - 1).coerceAtLeast(0)) },
+                            isSelected = product.id in selectedProducts,
+                            showCheckbox = bulkPriceMode,
+                            onToggleSelect = {
+                                selectedProducts = if (product.id in selectedProducts)
+                                    selectedProducts - product.id else selectedProducts + product.id
                             }
                         )
                     }
                 }
             }
+        } // end inner Column
+
+        // Bulk price bottom bar
+        AnimatedVisibility(
+            visible = selectedProducts.isNotEmpty(),
+            enter = slideInVertically { it } + fadeIn(),
+            exit = slideOutVertically { it } + fadeOut(),
+            modifier = Modifier.align(Alignment.BottomCenter)
+        ) {
+            Surface(tonalElevation = 12.dp, modifier = Modifier.fillMaxWidth(), color = MaterialTheme.colorScheme.tertiary) {
+                Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
+                    Text(
+                        "${Helpers.toPersianDigits(selectedProducts.size.toString())} محصول انتخاب شده",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = bulkPercentInput,
+                            onValueChange = { bulkPercentInput = it },
+                            placeholder = { Text("درصد تغییر قیمت (مثلاً ۱۵ یا -۱۰)", fontSize = 11.sp, color = Color.White.copy(alpha = 0.6f)) },
+                            modifier = Modifier.weight(1f).height(52.dp),
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = Color.White,
+                                unfocusedBorderColor = Color.White.copy(alpha = 0.5f),
+                                focusedTextColor = Color.White,
+                                unfocusedTextColor = Color.White,
+                                cursorColor = Color.White
+                            )
+                        )
+                        Button(
+                            onClick = {
+                                val pct = bulkPercentInput.toIntOrNull()
+                                if (pct != null) {
+                                    viewModel.bulkUpdateProductPrice(selectedProducts, pct)
+                                    val sign = if (pct >= 0) "+" else ""
+                                    Toast.makeText(context, "$sign$pct٪ قیمت برای ${selectedProducts.size} محصول اعمال شد", Toast.LENGTH_SHORT).show()
+                                    selectedProducts = emptySet()
+                                    bulkPriceMode = false
+                                    bulkPercentInput = ""
+                                } else {
+                                    Toast.makeText(context, "درصد معتبری وارد کنید", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = MaterialTheme.colorScheme.tertiary),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Icon(Icons.Default.Check, null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("اعمال", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        }
+                        IconButton(onClick = { selectedProducts = emptySet(); bulkPriceMode = false; bulkPercentInput = "" }) {
+                            Icon(Icons.Default.Close, null, tint = Color.White)
+                        }
+                    }
+                }
+            }
+        }
+        } // end Box
+
+        // Barcode manual input fallback dialog
+        if (showBarcodeFallback) {
+            AlertDialog(
+                onDismissRequest = { showBarcodeFallback = false },
+                title = { Text("جستجوی بارکد / SKU") },
+                text = {
+                    Column {
+                        Text("نرم‌افزار بارکدخوان نصب نیست. SKU یا کد محصول را وارد کنید:", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                        Spacer(modifier = Modifier.height(12.dp))
+                        OutlinedTextField(
+                            value = barcodeManualInput,
+                            onValueChange = { barcodeManualInput = it },
+                            placeholder = { Text("SKU یا بارکد محصول") },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            singleLine = true
+                        )
+                    }
+                },
+                confirmButton = {
+                    Button(onClick = {
+                        viewModel.updateProductSearch(barcodeManualInput)
+                        barcodeManualInput = ""
+                        showBarcodeFallback = false
+                    }) { Text("جستجو") }
+                },
+                dismissButton = { TextButton(onClick = { showBarcodeFallback = false }) { Text("انصراف") } }
+            )
         }
 
         // Quick Stock adjust Dialog
@@ -759,22 +918,35 @@ fun ProductItemCard(
     product: WooProduct,
     onEdit: () -> Unit,
     onPriceChange: () -> Unit,
-    onStockChange: () -> Unit
+    onStockChange: () -> Unit,
+    onClone: () -> Unit = {},
+    onIncrementStock: () -> Unit = {},
+    onDecrementStock: () -> Unit = {},
+    isSelected: Boolean = false,
+    showCheckbox: Boolean = false,
+    onToggleSelect: () -> Unit = {}
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().clickable(enabled = showCheckbox) { onToggleSelect() },
         shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+                             else MaterialTheme.colorScheme.surface
+        ),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        border = BorderStroke(
-            width = 1.dp,
-            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.08f)
-        )
+        border = if (isSelected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+                 else BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.08f))
     ) {
         Row(
             modifier = Modifier.padding(14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // Bulk checkbox
+            if (showCheckbox) {
+                Checkbox(checked = isSelected, onCheckedChange = { onToggleSelect() }, modifier = Modifier.size(24.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+            }
+
             // Product image with elegant corner clips and thin border representation
             Box(
                 modifier = Modifier
@@ -896,51 +1068,47 @@ fun ProductItemCard(
                     else "موجود در انبار (${Helpers.toPersianDigits(product.stockQuantity)} عدد)"
 
                 Column(modifier = Modifier.fillMaxWidth()) {
+                    // Inline stock editor row
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        // Tiny dot
-                        Box(
-                            modifier = Modifier
-                                .size(6.dp)
-                                .clip(CircleShape)
-                                .background(stockColor)
-                        )
+                        Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(stockColor))
                         Text(
-                            text = stockText,
+                            text = if (product.stockQuantity == 0) "ناموجود" else if (product.stockQuantity <= product.lowStockThreshold) "رو به اتمام" else "موجود",
                             color = stockColor,
                             fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.weight(1f)
                         )
-                        
-                        if (product.warehouseNote.isNotBlank()) {
-                            Text(
-                                text = "• ${product.warehouseNote}",
-                                fontSize = 10.sp,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
+                        // Inline -/qty/+ controls
+                        Box(
+                            modifier = Modifier.size(20.dp).clip(CircleShape)
+                                .background(stockColor.copy(alpha = 0.12f))
+                                .clickable { onDecrementStock() },
+                            contentAlignment = Alignment.Center
+                        ) { Icon(Icons.Default.Remove, null, modifier = Modifier.size(12.dp), tint = stockColor) }
+                        Text(
+                            text = Helpers.toPersianDigits(product.stockQuantity.toString()),
+                            fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, color = stockColor,
+                            modifier = Modifier.padding(horizontal = 4.dp)
+                        )
+                        Box(
+                            modifier = Modifier.size(20.dp).clip(CircleShape)
+                                .background(stockColor.copy(alpha = 0.12f))
+                                .clickable { onIncrementStock() },
+                            contentAlignment = Alignment.Center
+                        ) { Icon(Icons.Default.Add, null, modifier = Modifier.size(12.dp), tint = stockColor) }
                     }
-                    
+
                     Spacer(modifier = Modifier.height(4.dp))
-                    
-                    // Miniature linear resource-meter
-                    val progressFraction = remember(product.stockQuantity) {
-                        if (product.stockQuantity == 0) 0f
-                        else if (product.stockQuantity <= product.lowStockThreshold) 0.35f
-                        else 1.0f
-                    }
+                    val progressFraction = if (product.stockQuantity == 0) 0f
+                        else if (product.stockQuantity <= product.lowStockThreshold) 0.35f else 1.0f
                     LinearProgressIndicator(
                         progress = { progressFraction },
-                        modifier = Modifier
-                            .fillMaxWidth(0.9f)
-                            .height(3.dp)
-                            .clip(RoundedCornerShape(2.dp)),
-                        color = stockColor,
-                        trackColor = stockColor.copy(alpha = 0.12f)
+                        modifier = Modifier.fillMaxWidth(0.9f).height(3.dp).clip(RoundedCornerShape(2.dp)),
+                        color = stockColor, trackColor = stockColor.copy(alpha = 0.12f)
                     )
                 }
             }
@@ -977,6 +1145,19 @@ fun ProductItemCard(
                         contentDescription = "ویرایش سریع انبار",
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(19.dp)
+                    )
+                }
+
+                // Clone product
+                IconButton(
+                    onClick = onClone,
+                    modifier = Modifier.size(34.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ContentCopy,
+                        contentDescription = "کپی محصول",
+                        tint = GreenMoney,
+                        modifier = Modifier.size(18.dp)
                     )
                 }
 
