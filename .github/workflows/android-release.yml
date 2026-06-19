@@ -28,11 +28,12 @@ jobs:
 
       - name: Create .env file
         run: |
-          if [ -n "${{ secrets.ENV_FILE }}" ]; then
-            echo "${{ secrets.ENV_FILE }}" > .env
-          else
-            cp .env.example .env 2>/dev/null || echo "GEMINI_API_KEY=demo_key" > .env
+          cp .env.example .env 2>/dev/null || true
+          if [ -n "$ENV_FILE" ]; then
+            echo "$ENV_FILE" > .env
           fi
+        env:
+          ENV_FILE: ${{ secrets.ENV_FILE }}
 
       - name: Create debug keystore
         run: |
@@ -52,8 +53,7 @@ jobs:
       - name: Build Debug APK
         run: ./gradlew assembleDebug
 
-      - name: Build Release APK (signed)
-        if: ${{ secrets.STORE_PASSWORD != '' }}
+      - name: Build Release APK (signed, optional)
         run: ./gradlew assembleRelease
         env:
           KEYSTORE_PATH: ${{ secrets.KEYSTORE_PATH }}
@@ -61,8 +61,7 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         continue-on-error: true
 
-      - name: Build Release AAB (signed)
-        if: ${{ secrets.STORE_PASSWORD != '' }}
+      - name: Build Release AAB (signed, optional)
         run: ./gradlew bundleRelease
         env:
           KEYSTORE_PATH: ${{ secrets.KEYSTORE_PATH }}
@@ -90,7 +89,7 @@ jobs:
             ### ویژگی‌های این نسخه:
             - **گزارشات مالی** – نمودار درآمد هفتگی، توزیع وضعیت سفارش‌ها، پرفروش‌ترین محصولات، روش‌های پرداخت، خلاصه انبار
             - **مدیریت کاربران ادمین** – افزودن/حذف/غیرفعال کردن ادمین با نقش‌های مختلف (مدیر اصلی، انباردار، حسابدار و...)
-            - **داشبورد هوشمند** – کارت‌های KPI، نمودار تعاملی فروش روزانه با Canvas
+            - **داشبورد هوشمند** – کارت‌های KPI، نمودار تعاملی فروش روزانه
             - **مدیریت سفارش‌ها** – تغییر وضعیت، کد رهگیری، وضعیت ارسال، فاکتور، برچسب ارسال
             - **مدیریت محصولات** – افزودن/ویرایش/حذف، کنترل موجودی، قیمت‌گذاری
             - **مدیریت مشتریان** – دسته‌بندی هوشمند، یادداشت داخلی، ارسال پیامک
@@ -110,13 +109,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload Signed Release APK
-        if: ${{ secrets.STORE_PASSWORD != '' }}
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.tag.outputs.tag }}
-          files: |
-            app/build/outputs/apk/release/*.apk
-            app/build/outputs/bundle/release/*.aab
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload Signed Release APK (if available)
+        run: |
+          if ls app/build/outputs/apk/release/*.apk 1>/dev/null 2>&1; then
+            echo "Signed release APK found"
+          else
+            echo "No signed release APK, skipping upload"
+          fi
