@@ -288,6 +288,20 @@ object WooCommerceSync {
         expiryJalali = dto.dateExpires ?: ""
     )
 
+    suspend fun syncOrdersOnly(
+        db: AppDatabase,
+        baseUrl: String,
+        consumerKey: String,
+        consumerSecret: String
+    ): List<WooOrder> = withContext(Dispatchers.IO) {
+        val api = buildApi(baseUrl, consumerKey, consumerSecret)
+        val existingIds = db.orderDao().getAllOrderIds().toSet()
+        val orders = api.getOrders()
+        val mapped = orders.map { mapOrder(it) }
+        db.orderDao().insertOrders(mapped)
+        mapped.filter { it.id !in existingIds }
+    }
+
     suspend fun syncAll(
         db: AppDatabase,
         baseUrl: String,

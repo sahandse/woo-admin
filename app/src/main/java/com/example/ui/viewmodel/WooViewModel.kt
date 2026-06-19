@@ -9,8 +9,13 @@ import com.example.core.utils.Helpers
 import com.example.core.utils.JalaliCalendar
 import com.example.data.*
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+
+private const val ORDER_POLL_INTERVAL_MS = 5 * 60 * 1000L // 5 minutes
 
 class WooViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -42,6 +47,16 @@ class WooViewModel(application: Application) : AndroidViewModel(application) {
     val stores: StateFlow<List<WooStore>> = repository.getAllStores()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    // --- SYNC STATES ---
+    private val _isSyncing = MutableStateFlow(false)
+    val isSyncing: StateFlow<Boolean> = _isSyncing.asStateFlow()
+
+    private val _syncMessage = MutableStateFlow<String?>(null)
+    val syncMessage: StateFlow<String?> = _syncMessage.asStateFlow()
+
+    private val _lastSyncTime = MutableStateFlow<String?>(null)
+    val lastSyncTime: StateFlow<String?> = _lastSyncTime.asStateFlow()
+
     // --- SEARCH / FILTER STATES ---
     private val _orderSearchQuery = MutableStateFlow("")
     val orderSearchQuery: StateFlow<String> = _orderSearchQuery.asStateFlow()
@@ -52,7 +67,7 @@ class WooViewModel(application: Application) : AndroidViewModel(application) {
     private val _productSearchQuery = MutableStateFlow("")
     val productSearchQuery: StateFlow<String> = _productSearchQuery.asStateFlow()
 
-    private val _productFilter = MutableStateFlow("ALL") // ALL, OUT_OF_STOCK, LOW_STOCK, FEATURED, DRAFT
+    private val _productFilter = MutableStateFlow("ALL")
     val productFilter: StateFlow<String> = _productFilter.asStateFlow()
 
     private val _productCategoryFilter = MutableStateFlow("ALL")
@@ -61,7 +76,7 @@ class WooViewModel(application: Application) : AndroidViewModel(application) {
     private val _customerSearchQuery = MutableStateFlow("")
     val customerSearchQuery: StateFlow<String> = _customerSearchQuery.asStateFlow()
 
-    private val _customerCategoryFilter = MutableStateFlow("ALL") // ALL, LOYAL, NEW, INACTIVE ...
+    private val _customerCategoryFilter = MutableStateFlow("ALL")
     val customerCategoryFilter: StateFlow<String> = _customerCategoryFilter.asStateFlow()
 
     // --- AUTH & CONFIG STATES ---
@@ -81,17 +96,132 @@ class WooViewModel(application: Application) : AndroidViewModel(application) {
     private val _isAiLoading = MutableStateFlow(false)
     val isAiLoading: StateFlow<Boolean> = _isAiLoading.asStateFlow()
 
+    private var pollingJob: Job? = null
+
     init {
         viewModelScope.launch(Dispatchers.IO) {
-            // Seed database to ensure it's loaded with rich initial data
             repository.seedDatabase()
-            
-            // Log in default user from preference
+
             val username = repository.activeAdminUsername
             val user = db.adminUserDao().getAdminUserByUsername(username)
             if (user != null) {
                 _loggedInUser.value = user
                 _isLoggedIn.value = true
+            }
+
+            // Auto-sync on startup if a store is already connected
+            val activeStore = db.storeDao().getActiveStore()
+            if (activeStore != null) {
+                runFullSync(activeStore)
+                startOrderPolling(activeStore)
+            }
+        }
+    }
+
+    // --- SYNC ENGINE ---
+
+    private suspend fun runFullSync(store: WooStore) {
+        _isSyncing.value = true
+        try {
+            WooCommerceSync.syncAll(
+                db = db,
+                baseUrl = store.url,
+                consumerKey = store.consumerKey,
+                consumerSecret = store.consumerSecret,
+                onProgress = { msg -> _syncMessage.value = msg }
+            )
+            _lastSyncTime.value = JalaliCalendar.getCurrentTime()
+            _syncMessage.value = "همگام‌سازی کامل انجام شد"
+        } catch (e: Exception) {
+            _syncMessage.value = "خطا در همگام‌سازی: ${e.localizedMessage}"
+            Log.e("WooSync", "Full sync failed", e)
+        } finally {
+            _isSyncing.value = false
+        }
+    }
+
+    private fun startOrderPolling(store: WooStore) {
+        pollingJob?.cancel()
+        pollingJob = viewModelScope.launch(Dispatchers.IO) {
+            while (isActive) {
+                delay(ORDER_POLL_INTERVAL_MS)
+                try {
+                    val newOrders = WooCommerceSync.syncOrdersOnly(
+                        db = db,
+                        baseUrl = store.url,
+                        consumerKey = store.consumerKey,
+                        consumerSecret = store.consumerSecret
+                    )
+                    if (newOrders.isNotEmpty()) {
+                        val today = JalaliCalendar.getTodayJalali().toString()
+                        for (order in newOrders) {
+                            db.notificationDao().insertNotification(
+                                WooNotification(
+                                    title = "سفارش جدید #${order.orderNumber}",
+                                    body = "${order.customerName} - ${Helpers.formatPrice(order.totalAmount)}",
+                                    type = "NEW_ORDER",
+                                    dateJalali = today,
+                                    isRead = false,
+                                    linkedId = order.id
+                                )
+                            )
+                            if (repository.smsNewOrderEnabled && order.customerPhone.isNotBlank()) {
+                                val msg = repository.smsTemplateNewOrder
+                                    .replace("{name}", order.customerName)
+                                    .replace("{order_id}", order.orderNumber)
+                                    .replace("{amount}", Helpers.formatPrice(order.totalAmount))
+                                repository.sendMeliPayamakSms(order.customerPhone, msg)
+                            }
+                        }
+                        _lastSyncTime.value = JalaliCalendar.getCurrentTime()
+                    }
+                } catch (e: Exception) {
+                    Log.w("WooSync", "Order poll failed: ${e.message}")
+                }
+            }
+        }
+    }
+
+    fun syncAllData() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val activeStore = db.storeDao().getActiveStore() ?: run {
+                _syncMessage.value = "هیچ فروشگاهی متصل نیست"
+                return@launch
+            }
+            runFullSync(activeStore)
+        }
+    }
+
+    fun syncOrdersNow() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val activeStore = db.storeDao().getActiveStore() ?: return@launch
+            _isSyncing.value = true
+            try {
+                val newOrders = WooCommerceSync.syncOrdersOnly(
+                    db = db,
+                    baseUrl = activeStore.url,
+                    consumerKey = activeStore.consumerKey,
+                    consumerSecret = activeStore.consumerSecret
+                )
+                val today = JalaliCalendar.getTodayJalali().toString()
+                for (order in newOrders) {
+                    db.notificationDao().insertNotification(
+                        WooNotification(
+                            title = "سفارش جدید #${order.orderNumber}",
+                            body = "${order.customerName} - ${Helpers.formatPrice(order.totalAmount)}",
+                            type = "NEW_ORDER",
+                            dateJalali = today,
+                            isRead = false,
+                            linkedId = order.id
+                        )
+                    )
+                }
+                _lastSyncTime.value = JalaliCalendar.getCurrentTime()
+                _syncMessage.value = if (newOrders.isNotEmpty()) "${newOrders.size} سفارش جدید دریافت شد" else "بروزرسانی انجام شد، سفارش جدیدی نیست"
+            } catch (e: Exception) {
+                _syncMessage.value = "خطا در دریافت سفارش‌ها"
+            } finally {
+                _isSyncing.value = false
             }
         }
     }
@@ -107,28 +237,25 @@ class WooViewModel(application: Application) : AndroidViewModel(application) {
     fun updateCustomerSearch(query: String) { _customerSearchQuery.value = query }
     fun setCustomerFilter(filter: String) { _customerCategoryFilter.value = filter }
 
-    // --- GET FILTERED LIST FLOWS ---
+    // --- FILTERED FLOWS ---
     val filteredOrders: Flow<List<WooOrder>> = combine(orders, orderSearchQuery, orderStatusFilter) { list, query, status ->
         list.filter { order ->
-            val matchesQuery = query.isBlank() || 
+            val matchesQuery = query.isBlank() ||
                 order.orderNumber.contains(query, ignoreCase = true) ||
                 order.customerName.contains(query, ignoreCase = true) ||
                 order.customerPhone.contains(query, ignoreCase = true) ||
                 order.customerEmail.contains(query, ignoreCase = true) ||
                 order.city.contains(query, ignoreCase = true)
-
             val matchesStatus = status == "ALL" || status == null || order.status == status
-
             matchesQuery && matchesStatus
         }
     }
 
     val filteredProducts: Flow<List<WooProduct>> = combine(products, productSearchQuery, productFilter, productCategoryFilter) { list, query, filter, catFilter ->
         list.filter { prod ->
-            val matchesQuery = query.isBlank() || 
+            val matchesQuery = query.isBlank() ||
                 prod.name.contains(query, ignoreCase = true) ||
                 prod.sku.contains(query, ignoreCase = true)
-
             val matchesFilter = when (filter) {
                 "ALL" -> true
                 "OUT_OF_STOCK" -> !prod.inStock || prod.stockQuantity <= 0
@@ -137,10 +264,8 @@ class WooViewModel(application: Application) : AndroidViewModel(application) {
                 "DRAFT" -> prod.status == "draft"
                 else -> true
             }
-
-            val matchesCategory = catFilter == "ALL" || 
+            val matchesCategory = catFilter == "ALL" ||
                 prod.categories.split(",").map { it.trim() }.contains(catFilter)
-
             matchesQuery && matchesFilter && matchesCategory
         }
     }
@@ -148,18 +273,16 @@ class WooViewModel(application: Application) : AndroidViewModel(application) {
     val filteredCustomers: Flow<List<WooCustomer>> = combine(customers, customerSearchQuery, customerCategoryFilter) { list, query, filter ->
         list.filter { cust ->
             val fullName = "${cust.firstName} ${cust.lastName}"
-            val matchesQuery = query.isBlank() || 
+            val matchesQuery = query.isBlank() ||
                 fullName.contains(query, ignoreCase = true) ||
                 cust.phone.contains(query, ignoreCase = true) ||
                 cust.email.contains(query, ignoreCase = true)
-
             val matchesFilter = filter == "ALL" || cust.category == filter
-
             matchesQuery && matchesFilter
         }
     }
 
-    // --- LOGIN IMPLEMENTATION ---
+    // --- LOGIN ---
     fun performLogin(username: String, password: String) {
         viewModelScope.launch {
             _loginError.value = null
@@ -167,15 +290,12 @@ class WooViewModel(application: Application) : AndroidViewModel(application) {
                 _loginError.value = "لطفاً نام کاربری و کلمه عبور را وارد کنید"
                 return@launch
             }
-
             val user = db.adminUserDao().getAdminUserByUsername(username)
             if (user != null) {
                 if (user.isActive) {
                     repository.activeAdminUsername = username
                     _loggedInUser.value = user
                     _isLoggedIn.value = true
-                    
-                    // Log the login activity
                     val today = JalaliCalendar.getTodayJalali().toString()
                     val time = JalaliCalendar.getCurrentTime()
                     db.adminActivityDao().insertActivity(
@@ -212,244 +332,121 @@ class WooViewModel(application: Application) : AndroidViewModel(application) {
                     )
                 )
             }
+            pollingJob?.cancel()
             _isLoggedIn.value = false
             _loggedInUser.value = null
             _loginError.value = null
         }
     }
 
-    // --- OPERATIONS ---
+    // --- ORDER OPERATIONS ---
     fun updateOrderStatus(orderId: Long, status: OrderStatus) {
-        viewModelScope.launch {
-            repository.changeOrderStatus(orderId, status)
-            
-            // Check if we need to auto-trigger low stock notification or status updates
-            if (status == OrderStatus.COMPLETED) {
-                // Mock-complete order actions
-            }
-        }
-    }
-
-    fun simulateNewReceivedOrder(order: WooOrder) {
-        viewModelScope.launch {
-            repository.createSimulatedOrder(order)
-        }
-    }
-
-    fun generateRandomOrderSimulation() {
-        viewModelScope.launch(Dispatchers.IO) {
-            val prods = products.value
-            val rndItems = mutableListOf<OrderItem>()
-            var totalAmt = 0L
-            
-            if (prods.isNotEmpty()) {
-                val count = (1..3).random()
-                for (i in 0 until count) {
-                    val p = prods.random()
-                    val qty = (1..2).random()
-                    val price = if (p.salePrice > 0) p.salePrice else p.regularPrice
-                    rndItems.add(
-                        OrderItem(
-                            productId = p.id,
-                            productName = p.name,
-                            quantity = qty,
-                            unitPrice = price,
-                            totalPrice = price * qty,
-                            image = p.mainImage
-                        )
-                    )
-                    totalAmt += price * qty
-                }
-            } else {
-                rndItems.add(
-                    OrderItem(
-                        productId = 101,
-                        productName = "تی‌شرت نخی مردانه",
-                        quantity = 1,
-                        unitPrice = 280000,
-                        totalPrice = 280000
-                    )
-                )
-                totalAmt = 280000
-            }
-            
-            val orderId = System.currentTimeMillis()
-            val orderNum = (10000 + (0..9999).random()).toString()
-            
-            val firstNames = listOf("علیرضا", "حمید", "کامران", "افشین", "شیما", "پگاه", "مرتضی", "نازنین", "سامان")
-            val lastNames = listOf("کریمی", "احمدی", "رجبی", "منصوری", "رضایی", "سهرابی", "صفری", "خسروی")
-            val name = "${firstNames.random()} ${lastNames.random()}"
-            val phone = "0912${(1000000..9999999).random()}"
-            val email = "cust_${orderNum}@example.com"
-            
-            val provinces = listOf("تهران", "اصفهان", "خراسان رضوی", "فارس", "آذربایجان شرقی")
-            val cities = listOf("تهران", "اصفهان", "مشهد", "شیراز", "تبریز")
-            val idx = (0..4).random()
-            val prov = provinces[idx]
-            val city = cities[idx]
-            
-            val todayJalali = JalaliCalendar.getTodayJalali().toString()
-            val currTime = JalaliCalendar.getCurrentTime()
-            
-            val newOrd = WooOrder(
-                id = orderId,
-                orderNumber = orderNum,
-                status = listOf("PROCESSING", "PENDING_PAYMENT", "ON_HOLD").random(),
-                createdAtJalali = todayJalali,
-                createdAtTime = currTime,
-                customerName = name,
-                customerPhone = phone,
-                customerEmail = email,
-                billingAddress = "خیابان آزادی، کوچه آفتاب، پلاک ${(1..100).random()}",
-                shippingAddress = "خیابان بهارستان، کوچه آفتاب، پلاک ${(1..100).random()}",
-                city = city,
-                province = prov,
-                postalCode = "143" + (1000000..9999999).random().toString(),
-                customerNote = listOf("", "لطفا قبل از ارسال تماس بگیرید", "بسته‌بندی کادویی شود").random(),
-                items = rndItems,
-                subtotal = totalAmt,
-                discount = 0,
-                shippingCost = 35000,
-                totalAmount = totalAmt + 35000,
-                paymentMethod = listOf("کارت به کارت", "درگاه پرداخت زرین‌پال", "پرداخت در محل").random(),
-                isPaid = listOf(true, false).random()
-            )
-            
-            repository.createSimulatedOrder(newOrd)
-        }
+        viewModelScope.launch { repository.changeOrderStatus(orderId, status) }
     }
 
     fun updateOrderShippingStatus(orderId: Long, shippingStatus: String) {
-        viewModelScope.launch {
-            repository.changeOrderShippingStatus(orderId, shippingStatus)
-        }
+        viewModelScope.launch { repository.changeOrderShippingStatus(orderId, shippingStatus) }
     }
 
     fun updateOrderPaymentStatus(orderId: Long, isPaid: Boolean) {
-        viewModelScope.launch {
-            repository.changeOrderPaymentStatus(orderId, isPaid)
-        }
+        viewModelScope.launch { repository.changeOrderPaymentStatus(orderId, isPaid) }
     }
 
     fun addOrderTracking(orderId: Long, trackingCode: String, company: String) {
-        viewModelScope.launch {
-            repository.saveOrderTracking(orderId, trackingCode, company)
-        }
+        viewModelScope.launch { repository.saveOrderTracking(orderId, trackingCode, company) }
     }
 
     fun updateOrderAdminNotes(orderId: Long, notes: String) {
-        viewModelScope.launch {
-            repository.saveOrderAdminNotes(orderId, notes)
-        }
+        viewModelScope.launch { repository.saveOrderAdminNotes(orderId, notes) }
     }
 
+    // --- PRODUCT OPERATIONS ---
     fun updateProductStock(productId: Long, qty: Int) {
-        viewModelScope.launch {
-            repository.updateProductStock(productId, qty, qty > 0)
-        }
+        viewModelScope.launch { repository.updateProductStock(productId, qty, qty > 0) }
     }
 
     fun updateProductPrice(productId: Long, regular: Long, sale: Long) {
-        viewModelScope.launch {
-            repository.updateProductPrice(productId, regular, sale)
-        }
+        viewModelScope.launch { repository.updateProductPrice(productId, regular, sale) }
     }
 
     fun deleteProduct(productId: Long, name: String) {
-        viewModelScope.launch {
-            repository.deleteProduct(productId, name)
-        }
+        viewModelScope.launch { repository.deleteProduct(productId, name) }
     }
 
     fun addProduct(product: WooProduct) {
-        viewModelScope.launch {
-            repository.createProduct(product)
-        }
+        viewModelScope.launch { repository.createProduct(product) }
     }
 
     fun editProduct(product: WooProduct) {
-        viewModelScope.launch {
-            repository.updateProduct(product)
-        }
+        viewModelScope.launch { repository.updateProduct(product) }
     }
 
+    // --- CUSTOMER OPERATIONS ---
     fun addCustomerNotes(customerId: Long, notes: String) {
-        viewModelScope.launch {
-            repository.insertCustomerInternalNotes(customerId, notes)
-        }
+        viewModelScope.launch { repository.insertCustomerInternalNotes(customerId, notes) }
     }
 
+    // --- COUPON OPERATIONS ---
     fun createCoupon(coupon: WooCoupon) {
-        viewModelScope.launch {
-            repository.addCoupon(coupon)
-        }
+        viewModelScope.launch { repository.addCoupon(coupon) }
     }
 
     fun removeCoupon(couponId: Long, code: String) {
-        viewModelScope.launch {
-            repository.deleteCoupon(couponId, code)
-        }
+        viewModelScope.launch { repository.deleteCoupon(couponId, code) }
     }
 
     fun toggleCouponActive(couponId: Long, active: Boolean) {
-        viewModelScope.launch {
-            repository.updateCouponActive(couponId, active)
-        }
+        viewModelScope.launch { repository.updateCouponActive(couponId, active) }
     }
 
+    // --- NOTIFICATION OPERATIONS ---
     fun readNotification(id: Long) {
-        viewModelScope.launch {
-            repository.markNotificationAsRead(id)
-        }
+        viewModelScope.launch { repository.markNotificationAsRead(id) }
     }
 
     fun removeNotification(id: Long) {
-        viewModelScope.launch {
-            repository.deleteNotification(id)
-        }
+        viewModelScope.launch { repository.deleteNotification(id) }
     }
 
+    // --- STORE OPERATIONS ---
     fun changeActiveStore(storeId: Long) {
         viewModelScope.launch {
             repository.switchActiveStore(storeId)
+            val newActive = db.storeDao().getActiveStore()
+            if (newActive != null) {
+                runFullSync(newActive)
+                startOrderPolling(newActive)
+            }
         }
     }
 
     fun createStore(store: WooStore) {
-        viewModelScope.launch {
-            repository.addNewStore(store)
-        }
+        viewModelScope.launch { repository.addNewStore(store) }
     }
 
     fun removeStore(storeId: Long) {
-        viewModelScope.launch {
-            repository.deleteStore(storeId)
-        }
+        viewModelScope.launch { repository.deleteStore(storeId) }
     }
 
+    // --- ADMIN USER OPERATIONS ---
     fun addAdminUser(user: AdminUser) {
-        viewModelScope.launch {
-            repository.addAdminUser(user)
-        }
+        viewModelScope.launch { repository.addAdminUser(user) }
     }
 
     fun removeAdminUser(userId: Long) {
-        viewModelScope.launch {
-            repository.deleteAdminUser(userId)
-        }
+        viewModelScope.launch { repository.deleteAdminUser(userId) }
     }
 
     fun toggleAdminUserActive(userId: Long, isActive: Boolean) {
-        viewModelScope.launch {
-            db.adminUserDao().updateAdminUserStatus(userId, isActive)
-        }
+        viewModelScope.launch { db.adminUserDao().updateAdminUserStatus(userId, isActive) }
     }
 
+    // --- SMS ---
     suspend fun sendSmsToCustomer(phone: String, text: String): com.example.core.network.SmsResult {
         return repository.sendMeliPayamakSms(phone, text)
     }
 
-    // --- SECURE WOOCOMMERCE API CONNECTION ENGINE ---
+    // --- WOOCOMMERCE CONNECTION ---
     fun connectWooCommerceSecurely(
         storeName: String,
         storeUrl: String,
@@ -462,41 +459,14 @@ class WooViewModel(application: Application) : AndroidViewModel(application) {
     ) {
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                if (storeName.isBlank()) {
-                    onError("نام فروشگاه نمی‌تواند خالی باشد")
-                    return@launch
-                }
-                if (storeUrl.isBlank() || !storeUrl.startsWith("http")) {
-                    onError("نشانی فروشگاه نامعتبر است. باید با http:// یا https:// شروع شود")
-                    return@launch
-                }
-                if (isHttpsOnly && !storeUrl.startsWith("https://")) {
-                    onError("جهت اتصال امن (SSL)، نشانی فروشگاه باید با https:// شروع شود")
-                    return@launch
-                }
-                if (consumerKey.isBlank() || !consumerKey.startsWith("ck_")) {
-                    onError("کلید مصرف‌کننده (Consumer Key) نامعتبر است. نمونه صحیح: ck_... ")
-                    return@launch
-                }
-                if (consumerSecret.isBlank() || !consumerSecret.startsWith("cs_")) {
-                    onError("رمز مصرف‌کننده (Consumer Secret) نامعتبر است. نمونه صحیح: cs_... ")
-                    return@launch
-                }
+                if (storeName.isBlank()) { onError("نام فروشگاه نمی‌تواند خالی باشد"); return@launch }
+                if (storeUrl.isBlank() || !storeUrl.startsWith("http")) { onError("نشانی فروشگاه نامعتبر است. باید با http:// یا https:// شروع شود"); return@launch }
+                if (isHttpsOnly && !storeUrl.startsWith("https://")) { onError("جهت اتصال امن، نشانی فروشگاه باید با https:// شروع شود"); return@launch }
+                if (consumerKey.isBlank() || !consumerKey.startsWith("ck_")) { onError("Consumer Key نامعتبر است. نمونه: ck_..."); return@launch }
+                if (consumerSecret.isBlank() || !consumerSecret.startsWith("cs_")) { onError("Consumer Secret نامعتبر است. نمونه: cs_..."); return@launch }
 
-                // Simulate connection steps with delay for beautiful professional feedback
-                onProgressUpdate("بررسی گواهی امنیتی SSL و آدرس دامنه...")
-                kotlinx.coroutines.delay(1000)
-                
-                onProgressUpdate("برقراری اتصال امن با سرور و دست‌دهی TLS...")
-                kotlinx.coroutines.delay(800)
+                onProgressUpdate("اتصال به سرور و احراز هویت...")
 
-                onProgressUpdate("ارسال درخواست امضا شده OAuth 1.0a...")
-                kotlinx.coroutines.delay(1000)
-
-                onProgressUpdate("احراز هویت وب‌سرویس ووکامرس (WooCommerce REST API v3)...")
-                kotlinx.coroutines.delay(500)
-
-                // Add the store connection
                 val newStore = WooStore(
                     name = storeName,
                     url = storeUrl,
@@ -504,9 +474,10 @@ class WooViewModel(application: Application) : AndroidViewModel(application) {
                     consumerSecret = consumerSecret,
                     isActive = true
                 )
+                db.storeDao().deactivateAllStores()
                 repository.addNewStore(newStore)
 
-                val usernameVal = "api_admin_${storeName.lowercase().replace(" ", "_").filter { it.isLetterOrDigit() }}"
+                val usernameVal = "api_${storeName.lowercase().replace(" ", "_").filter { it.isLetterOrDigit() }}"
                 val user = AdminUser(
                     fullName = storeName,
                     username = usernameVal,
@@ -515,8 +486,7 @@ class WooViewModel(application: Application) : AndroidViewModel(application) {
                 )
                 db.adminUserDao().insertAdminUser(user)
 
-                // Sync real data from WooCommerce REST API
-                com.example.data.WooCommerceSync.syncAll(
+                WooCommerceSync.syncAll(
                     db = db,
                     baseUrl = storeUrl,
                     consumerKey = consumerKey,
@@ -524,7 +494,6 @@ class WooViewModel(application: Application) : AndroidViewModel(application) {
                     onProgress = { msg -> onProgressUpdate(msg) }
                 )
 
-                // Log activity
                 val today = JalaliCalendar.getTodayJalali().toString()
                 val time = JalaliCalendar.getCurrentTime()
                 db.adminActivityDao().insertActivity(
@@ -532,7 +501,7 @@ class WooViewModel(application: Application) : AndroidViewModel(application) {
                         adminName = user.fullName,
                         adminRole = user.role,
                         actionType = "LOGIN",
-                        details = "اتصال امن برقرار شد و داده‌های واقعی ووکامرس با موفقیت همگام‌سازی شدند.",
+                        details = "اتصال موفق به ووکامرس و همگام‌سازی داده‌های واقعی",
                         timestampJalali = "$today - $time"
                     )
                 )
@@ -540,41 +509,38 @@ class WooViewModel(application: Application) : AndroidViewModel(application) {
                 repository.activeAdminUsername = usernameVal
                 _loggedInUser.value = user
                 _isLoggedIn.value = true
+                _lastSyncTime.value = time
+
+                val savedStore = db.storeDao().getActiveStore()
+                if (savedStore != null) startOrderPolling(savedStore)
 
                 onProgressUpdate("همگام‌سازی با موفقیت انجام شد!")
-                kotlinx.coroutines.delay(400)
-                
                 onSuccess()
             } catch (e: Exception) {
-                onError("خطا در برقراری ارتباط با وبسایت: ${e.localizedMessage}")
+                onError("خطا در برقراری ارتباط: ${e.localizedMessage}")
             }
         }
     }
 
-    // --- SMART AI ANALYSIS WITH GEMINI API ---
+    // --- AI ANALYSIS ---
     fun runAiAnalysis(prompt: String) {
         viewModelScope.launch {
             _isAiLoading.value = true
             _aiResult.value = null
             try {
-                // Enrich prompt with store data if needed
                 val ordersList = orders.value
                 val lowStockList = products.value.filter { it.manageStock && it.stockQuantity <= it.lowStockThreshold }
-                
                 val contextPrompt = """
-                    آمار فروشگاه فعلی:
+                    آمار فروشگاه:
                     تعداد کل سفارش‌ها: ${ordersList.size}
-                    جمع کل مبلغ فروش: ${Helpers.formatPrice(ordersList.sumOf { it.totalAmount })}
-                    تعداد کالاهای رو به اتمام (کم‌موجودی): ${lowStockList.size} (${lowStockList.joinToString { it.name }})
-                    
-                    درخواست مدیر فروشگاه:
+                    جمع کل فروش: ${Helpers.formatPrice(ordersList.sumOf { it.totalAmount })}
+                    کالاهای کم‌موجودی: ${lowStockList.size} (${lowStockList.joinToString { it.name }})
+
                     $prompt
                 """.trimIndent()
-
-                val response = GeminiManager.generateAnalysis(contextPrompt)
-                _aiResult.value = response
+                _aiResult.value = GeminiManager.generateAnalysis(contextPrompt)
             } catch (e: Exception) {
-                _aiResult.value = "خطا در برقراری ارتباط با مدل هوش مصنوعی: ${e.localizedMessage}"
+                _aiResult.value = "خطا در ارتباط با هوش مصنوعی: ${e.localizedMessage}"
             } finally {
                 _isAiLoading.value = false
             }

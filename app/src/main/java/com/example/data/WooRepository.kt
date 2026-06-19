@@ -17,9 +17,8 @@ class WooRepository(private val db: AppDatabase, private val context: Context) {
         get() = sharedPrefs.getBoolean("is_dark_theme_enabled", true)
         set(value) = sharedPrefs.edit().putBoolean("is_dark_theme_enabled", value).apply()
 
-    // Demo Mode toggle: True by default so that they can see a fully populated professional app first.
     var isDemoMode: Boolean
-        get() = sharedPrefs.getBoolean("is_demo_mode", true)
+        get() = sharedPrefs.getBoolean("is_demo_mode", false)
         set(value) = sharedPrefs.edit().putBoolean("is_demo_mode", value).apply()
 
     var jwtToken: String
@@ -261,6 +260,10 @@ class WooRepository(private val db: AppDatabase, private val context: Context) {
 
     suspend fun getActiveAdmin(): AdminUser? = withContext(Dispatchers.IO) {
         db.adminUserDao().getAdminUserByUsername(activeAdminUsername)
+    }
+
+    suspend fun getActiveStore(): WooStore? = withContext(Dispatchers.IO) {
+        db.storeDao().getActiveStore()
     }
 
     private suspend fun logActivity(actionType: String, details: String) {

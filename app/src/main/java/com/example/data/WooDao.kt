@@ -62,6 +62,9 @@ interface OrderDao {
     @Query("UPDATE woo_orders SET adminNotes = :adminNotes WHERE id = :orderId")
     suspend fun updateOrderAdminNotes(orderId: Long, adminNotes: String)
 
+    @Query("SELECT id FROM woo_orders")
+    suspend fun getAllOrderIds(): List<Long>
+
     @Query("DELETE FROM woo_orders")
     suspend fun clearAllOrders()
 }

@@ -427,8 +427,8 @@ fun DashboardScreen(
                     val context = LocalContext.current
                     Button(
                         onClick = {
-                            viewModel.generateRandomOrderSimulation()
-                            Toast.makeText(context, "سفارش جدید شبیه‌سازی شد! اعلان بالا ظاهر می‌شود.", Toast.LENGTH_LONG).show()
+                            viewModel.syncOrdersNow()
+                            Toast.makeText(context, "در حال بروزرسانی سفارش‌ها از سایت...", Toast.LENGTH_SHORT).show()
                         },
                         shape = RoundedCornerShape(12.dp),
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
@@ -439,11 +439,11 @@ fun DashboardScreen(
                             horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             Icon(
-                                imageVector = Icons.Default.AddCircleOutline,
+                                imageVector = Icons.Default.Refresh,
                                 contentDescription = null,
                                 modifier = Modifier.size(16.dp)
                             )
-                            Text("دریافت سفارش", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            Text("بروزرسانی سفارش‌ها", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }

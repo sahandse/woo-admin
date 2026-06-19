@@ -428,33 +428,8 @@ fun CustomersScreen(
                             )
                         }
 
-                        // Simulation banner if demo or partially configured
-                        if (repo.isDemoMode) {
-                            Card(
-                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f)),
-                                modifier = Modifier.fillMaxWidth(),
-                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(10.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    verticalAlignment = Alignment.Top
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Info,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Text(
-                                        text = "برنامه در حالتِ آزمایشی (Demo) قرار دارد. ارسال پیام به کل مشتریان و شماره دلخواه با موفقیت آزمایش شده و ارسال مجازی انجام خواهد شد.",
-                                        fontSize = 10.sp,
-                                        lineHeight = 14.sp,
-                                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                                    )
-                                }
-                            }
-                        } else if (!isMeliConfigured) {
+                        // Configuration warning banner
+                        if (!isMeliConfigured) {
                             Card(
                                 colors = CardDefaults.cardColors(containerColor = Color(0xFFFF9800).copy(alpha = 0.12f)),
                                 modifier = Modifier.fillMaxWidth(),
@@ -989,33 +964,8 @@ fun CustomerDetailsScreen(
                             )
                         }
 
-                        // Demo / Configuration warning banner
-                        if (repo.isDemoMode) {
-                            Card(
-                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.15f)),
-                                modifier = Modifier.fillMaxWidth(),
-                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.2f))
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(10.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    verticalAlignment = Alignment.Top
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Info,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Text(
-                                        text = "حالت نمایشی فعال است. ارسال پیامک به صورت مجازی شبیه‌سازی شده و در دفتر فعالیت‌های سیستم ثبت خواهد شد.",
-                                        fontSize = 10.sp,
-                                        lineHeight = 14.sp,
-                                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                                    )
-                                }
-                            }
-                        } else if (!isMeliConfigured) {
+                        // Configuration warning banner
+                        if (!isMeliConfigured) {
                             Card(
                                 colors = CardDefaults.cardColors(containerColor = Color(0xFFFF9800).copy(alpha = 0.12f)),
                                 modifier = Modifier.fillMaxWidth(),
