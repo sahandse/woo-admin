@@ -489,16 +489,13 @@ class WooViewModel(application: Application) : AndroidViewModel(application) {
                 
                 onProgressUpdate("برقراری اتصال امن با سرور و دست‌دهی TLS...")
                 kotlinx.coroutines.delay(800)
-                
+
                 onProgressUpdate("ارسال درخواست امضا شده OAuth 1.0a...")
                 kotlinx.coroutines.delay(1000)
-                
-                onProgressUpdate("احراز هویت وب‌سرویس ووکامرس (WooCommerce REST API v3)...")
-                kotlinx.coroutines.delay(1000)
 
-                onProgressUpdate("همگام‌سازی و بارگذاری نمونه محصولات و سفارش‌های ووکامرس...")
-                kotlinx.coroutines.delay(600)
-                
+                onProgressUpdate("احراز هویت وب‌سرویس ووکامرس (WooCommerce REST API v3)...")
+                kotlinx.coroutines.delay(500)
+
                 // Add the store connection
                 val newStore = WooStore(
                     name = storeName,
@@ -508,11 +505,8 @@ class WooViewModel(application: Application) : AndroidViewModel(application) {
                     isActive = true
                 )
                 repository.addNewStore(newStore)
-                
-                // Set as active store
-                // Find default user
+
                 val usernameVal = "api_admin_${storeName.lowercase().replace(" ", "_").filter { it.isLetterOrDigit() }}"
-                
                 val user = AdminUser(
                     fullName = storeName,
                     username = usernameVal,
@@ -520,7 +514,16 @@ class WooViewModel(application: Application) : AndroidViewModel(application) {
                     isActive = true
                 )
                 db.adminUserDao().insertAdminUser(user)
-                
+
+                // Sync real data from WooCommerce REST API
+                com.example.data.WooCommerceSync.syncAll(
+                    db = db,
+                    baseUrl = storeUrl,
+                    consumerKey = consumerKey,
+                    consumerSecret = consumerSecret,
+                    onProgress = { msg -> onProgressUpdate(msg) }
+                )
+
                 // Log activity
                 val today = JalaliCalendar.getTodayJalali().toString()
                 val time = JalaliCalendar.getCurrentTime()
@@ -529,18 +532,17 @@ class WooViewModel(application: Application) : AndroidViewModel(application) {
                         adminName = user.fullName,
                         adminRole = user.role,
                         actionType = "LOGIN",
-                        details = "اتصال امن برقرار شد و همگام‌سازی ووکامرس با موفقیت به پایان رسید.",
+                        details = "اتصال امن برقرار شد و داده‌های واقعی ووکامرس با موفقیت همگام‌سازی شدند.",
                         timestampJalali = "$today - $time"
                     )
                 )
 
-                // Log in
                 repository.activeAdminUsername = usernameVal
                 _loggedInUser.value = user
                 _isLoggedIn.value = true
 
-                onProgressUpdate("اتصال با موفقیت برقرار شد!")
-                kotlinx.coroutines.delay(500)
+                onProgressUpdate("همگام‌سازی با موفقیت انجام شد!")
+                kotlinx.coroutines.delay(400)
                 
                 onSuccess()
             } catch (e: Exception) {

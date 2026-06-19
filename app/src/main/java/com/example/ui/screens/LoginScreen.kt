@@ -42,16 +42,15 @@ fun LoginScreen(
 ) {
     var activeTab by remember { mutableStateOf(0) } // 0 = دمو, 1 = اتصال مستقیم ووکامرس
 
-    // Quick sandbox fields
-    var username by remember { mutableStateOf("admin") }
-    var password by remember { mutableStateOf("admin123") }
+    var username by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
     var showPassword by remember { mutableStateOf(false) }
 
     // API connection fields
-    var storeName by remember { mutableStateOf("فروشگاه اصلی ووکامرس") }
-    var storeUrl by remember { mutableStateOf("https://my-store.ir") }
-    var consumerKey by remember { mutableStateOf("ck_a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0") }
-    var consumerSecret by remember { mutableStateOf("cs_a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0") }
+    var storeName by remember { mutableStateOf("") }
+    var storeUrl by remember { mutableStateOf("") }
+    var consumerKey by remember { mutableStateOf("") }
+    var consumerSecret by remember { mutableStateOf("") }
     var isHttpsOnly by remember { mutableStateOf(true) }
 
     // Connection process status
@@ -262,71 +261,6 @@ fun LoginScreen(
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(32.dp))
-
-                    // Quick links for Testing different permission structures
-                    Text(
-                        text = "جهت بررسی سریع سطوح دسترسی بر روی یکی از نقش‌ها بزنید:",
-                        fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                        textAlign = TextAlign.Right,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        // Super Admin
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.05f))
-                                .clickable {
-                                    username = "admin"
-                                    password = "admin123"
-                                }
-                                .padding(8.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("مدیر اصلی\n(admin)", fontSize = 10.sp, textAlign = TextAlign.Center, fontWeight = FontWeight.SemiBold)
-                        }
-
-                        // Store Admin
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.05f))
-                                .clickable {
-                                    username = "arash_store"
-                                    password = "arash123"
-                                }
-                                .padding(8.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("مدیر فروشگاه\n(arash_store)", fontSize = 10.sp, textAlign = TextAlign.Center, fontWeight = FontWeight.SemiBold)
-                        }
-
-                        // Warehouse Clerk
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.05f))
-                                .clickable {
-                                    username = "sajad_pack"
-                                    password = "sajad123"
-                                }
-                                .padding(8.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("انباردار\n(sajad_pack)", fontSize = 10.sp, textAlign = TextAlign.Center, fontWeight = FontWeight.SemiBold)
-                        }
-                    }
                 } else {
                     // --- TAB II: REAL WOOCOMMERCE CONNECTION RECEIVER ---
 

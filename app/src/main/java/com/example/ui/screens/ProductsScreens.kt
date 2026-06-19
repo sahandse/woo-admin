@@ -26,6 +26,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import coil.compose.AsyncImage
 import com.example.core.utils.Helpers
 import com.example.data.WooProduct
@@ -992,31 +998,46 @@ fun AddEditProductScreen(
     var name by remember { mutableStateOf(product?.name ?: "") }
     var sku by remember { mutableStateOf(product?.sku ?: "") }
     var regularPrice by remember { mutableStateOf(product?.regularPrice?.toString() ?: "") }
-    var salePrice by remember { mutableStateOf(product?.salePrice?.toString() ?: "0") }
+    var salePrice by remember { mutableStateOf(product?.salePrice?.takeIf { it > 0 }?.toString() ?: "") }
     var stockQuantity by remember { mutableStateOf(product?.stockQuantity?.toString() ?: "") }
     var lowThreshold by remember { mutableStateOf(product?.lowStockThreshold?.toString() ?: "3") }
     var categories by remember { mutableStateOf(product?.categories ?: "") }
+    var tags by remember { mutableStateOf(product?.tags ?: "") }
     var shortDesc by remember { mutableStateOf(product?.shortDescription ?: "") }
     var desc by remember { mutableStateOf(product?.description ?: "") }
     var warehouseNote by remember { mutableStateOf(product?.warehouseNote ?: "") }
-    var imageLink by remember { mutableStateOf(product?.mainImage ?: "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=400&q=80") }
+    var imageLink by remember { mutableStateOf(product?.mainImage ?: "") }
+    var imageUri by remember { mutableStateOf<Uri?>(null) }
+    var showUrlInput by remember { mutableStateOf(false) }
 
-    var length by remember { mutableStateOf(product?.length?.toString() ?: "0") }
-    var width by remember { mutableStateOf(product?.width?.toString() ?: "0") }
-    var height by remember { mutableStateOf(product?.height?.toString() ?: "0") }
-    var weight by remember { mutableStateOf(product?.weight?.toString() ?: "0") }
+    var length by remember { mutableStateOf(product?.length?.takeIf { it > 0 }?.toString() ?: "") }
+    var width by remember { mutableStateOf(product?.width?.takeIf { it > 0 }?.toString() ?: "") }
+    var height by remember { mutableStateOf(product?.height?.takeIf { it > 0 }?.toString() ?: "") }
+    var weight by remember { mutableStateOf(product?.weight?.takeIf { it > 0 }?.toString() ?: "") }
 
     var isVirtual by remember { mutableStateOf(product?.isVirtual ?: false) }
     var isDownloadable by remember { mutableStateOf(product?.isDownloadable ?: false) }
-    var isPublish by remember { mutableStateOf(product?.status == "publish") }
+    var isPublish by remember { mutableStateOf(product?.status != "draft") }
 
     val context = LocalContext.current
+
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let {
+            imageUri = it
+            imageLink = it.toString()
+            showUrlInput = false
+        }
+    }
+
+    val displayImageModel: Any? = imageUri ?: imageLink.takeIf { it.isNotBlank() }
 
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
         Scaffold(
             topBar = {
                 TopAppBar(
-                    title = { Text(if (product != null) "ویرایش محصول ${product.sku}" else "افزودن محصول جدید") },
+                    title = { Text(if (product != null) "ویرایش: ${product.name}" else "افزودن محصول جدید") },
                     navigationIcon = {
                         IconButton(onClick = onBack) {
                             Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "بازگشت")
@@ -1035,11 +1056,14 @@ fun AddEditProductScreen(
                     Box(modifier = Modifier.padding(16.dp)) {
                         Button(
                             onClick = {
-                                if (name.isBlank() || regularPrice.toLongOrNull() == null) {
-                                    Toast.makeText(context, "نام کالا و قیمت اصلی الزامی هستند.", Toast.LENGTH_SHORT).show()
+                                if (name.isBlank()) {
+                                    Toast.makeText(context, "نام محصول الزامی است.", Toast.LENGTH_SHORT).show()
                                     return@Button
                                 }
-
+                                if (regularPrice.toLongOrNull() == null) {
+                                    Toast.makeText(context, "قیمت اصلی معتبر وارد کنید.", Toast.LENGTH_SHORT).show()
+                                    return@Button
+                                }
                                 val finalProduct = WooProduct(
                                     id = product?.id ?: System.currentTimeMillis(),
                                     name = name,
@@ -1058,29 +1082,28 @@ fun AddEditProductScreen(
                                     width = width.toDoubleOrNull() ?: 0.0,
                                     height = height.toDoubleOrNull() ?: 0.0,
                                     categories = categories,
-                                    tags = "محصول, ووکامرس",
+                                    tags = tags,
                                     mainImage = imageLink,
                                     status = if (isPublish) "publish" else "draft",
                                     isVirtual = isVirtual,
                                     isDownloadable = isDownloadable,
                                     warehouseNote = warehouseNote
                                 )
-
                                 if (product != null) {
                                     viewModel.editProduct(finalProduct)
-                                    Toast.makeText(context, "تغییرات محصول با موفقیت ذخیره شد", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, "تغییرات ذخیره شد.", Toast.LENGTH_SHORT).show()
                                 } else {
                                     viewModel.addProduct(finalProduct)
-                                    Toast.makeText(context, "کالای جدید به ووکامرس افزوده شد", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, "محصول جدید اضافه شد.", Toast.LENGTH_SHORT).show()
                                 }
                                 onBack()
                             },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(52.dp),
+                            modifier = Modifier.fillMaxWidth().height(52.dp),
                             shape = RoundedCornerShape(12.dp)
                         ) {
-                            Text(if (product != null) "ذخیره تغییرات" else "انتشار محصول در وبسایت", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                            Icon(imageVector = if (product != null) Icons.Filled.Save else Icons.Filled.Add, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(if (product != null) "ذخیره تغییرات" else "انتشار محصول", fontSize = 15.sp, fontWeight = FontWeight.Bold)
                         }
                     }
                 }
@@ -1090,166 +1113,320 @@ fun AddEditProductScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues)
-                    .padding(horizontal = 16.dp)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                    .verticalScroll(rememberScrollState())
             ) {
-                Spacer(modifier = Modifier.height(4.dp))
 
-                // Basic Specifications
-                Text("مشخصات کلیدی کالا", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                // ---- IMAGE SECTION ----
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(220.dp)
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                ) {
+                    if (displayImageModel != null) {
+                        AsyncImage(
+                            model = displayImageModel,
+                            contentDescription = "تصویر محصول",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(72.dp)
+                                .align(Alignment.BottomCenter)
+                                .background(Color.Black.copy(alpha = 0.45f))
+                        )
+                    } else {
+                        Column(
+                            modifier = Modifier.align(Alignment.Center),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.AddPhotoAlternate,
+                                contentDescription = null,
+                                modifier = Modifier.size(60.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                            )
+                            Text(
+                                "تصویری انتخاب نشده",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                                fontSize = 13.sp
+                            )
+                        }
+                    }
 
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("نام محصول") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(10.dp)
-                )
+                    Row(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = { imagePickerLauncher.launch("image/*") },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                        ) {
+                            Icon(imageVector = Icons.Filled.PhotoLibrary, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("انتخاب از گالری", fontSize = 12.sp)
+                        }
+                        OutlinedButton(
+                            onClick = { showUrlInput = !showUrlInput },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(containerColor = Color.White.copy(alpha = 0.15f)),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.6f))
+                        ) {
+                            Icon(imageVector = Icons.Filled.Link, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.White)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("آدرس URL", fontSize = 12.sp, color = Color.White)
+                        }
+                    }
+                }
 
-                OutlinedTextField(
-                    value = sku,
-                    onValueChange = { sku = it },
-                    label = { Text("کد شناسه تجاری انبار (SKU)") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(10.dp)
-                )
+                AnimatedVisibility(visible = showUrlInput) {
+                    OutlinedTextField(
+                        value = imageLink,
+                        onValueChange = { imageLink = it; imageUri = null },
+                        label = { Text("آدرس URL تصویر") },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        leadingIcon = { Icon(Icons.Filled.Link, contentDescription = null) },
+                        singleLine = true
+                    )
+                }
 
-                OutlinedTextField(
-                    value = categories,
-                    onValueChange = { categories = it },
-                    label = { Text("دسته‌بندی‌ها (با کاما جدا کنید)") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(10.dp)
-                )
+                // ---- BASIC INFO ----
+                ProductSectionHeader(title = "اطلاعات اصلی محصول", icon = Icons.Filled.Edit)
 
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    OutlinedTextField(
+                        value = name,
+                        onValueChange = { name = it },
+                        label = { Text("نام محصول *") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp),
+                        singleLine = true
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                        OutlinedTextField(
+                            value = sku,
+                            onValueChange = { sku = it },
+                            label = { Text("SKU / کد انبار") },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(10.dp),
+                            singleLine = true
+                        )
+                        OutlinedTextField(
+                            value = categories,
+                            onValueChange = { categories = it },
+                            label = { Text("دسته‌بندی") },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(10.dp),
+                            singleLine = true
+                        )
+                    }
+                    OutlinedTextField(
+                        value = tags,
+                        onValueChange = { tags = it },
+                        label = { Text("برچسب‌ها (با کاما جدا کنید)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp),
+                        singleLine = true,
+                        leadingIcon = { Icon(Icons.Filled.LocalOffer, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                    )
+                }
+
+                // ---- PRICING ----
+                ProductSectionHeader(title = "قیمت‌گذاری", icon = Icons.Filled.AttachMoney)
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
                     OutlinedTextField(
                         value = regularPrice,
                         onValueChange = { regularPrice = it },
-                        label = { Text("قیمت عادی (تومان)") },
+                        label = { Text("قیمت اصلی (تومان) *") },
                         modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(10.dp)
+                        shape = RoundedCornerShape(10.dp),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true
                     )
-
                     OutlinedTextField(
                         value = salePrice,
                         onValueChange = { salePrice = it },
                         label = { Text("قیمت حراجی (تومان)") },
                         modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(10.dp)
+                        shape = RoundedCornerShape(10.dp),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true
                     )
                 }
 
-                // Inventory Management Group
-                Text("موجودی انبار و فیلترها", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                // ---- INVENTORY ----
+                ProductSectionHeader(title = "موجودی انبار", icon = Icons.Filled.Inventory)
 
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                        OutlinedTextField(
+                            value = stockQuantity,
+                            onValueChange = { stockQuantity = it },
+                            label = { Text("موجودی فعلی") },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(10.dp),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true
+                        )
+                        OutlinedTextField(
+                            value = lowThreshold,
+                            onValueChange = { lowThreshold = it },
+                            label = { Text("حد هشدار کمبود") },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(10.dp),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true
+                        )
+                    }
                     OutlinedTextField(
-                        value = stockQuantity,
-                        onValueChange = { stockQuantity = it },
-                        label = { Text("موجودی فعلی انبار") },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(10.dp)
-                    )
-
-                    OutlinedTextField(
-                        value = lowThreshold,
-                        onValueChange = { lowThreshold = it },
-                        label = { Text("حد هشدار کمبود کالا") },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(10.dp)
+                        value = warehouseNote,
+                        onValueChange = { warehouseNote = it },
+                        label = { Text("موقعیت انبار (مثلاً قفسه B ردیف ۳)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp),
+                        singleLine = true,
+                        leadingIcon = { Icon(Icons.Filled.LocationOn, contentDescription = null, modifier = Modifier.size(18.dp)) }
                     )
                 }
 
-                OutlinedTextField(
-                    value = warehouseNote,
-                    onValueChange = { warehouseNote = it },
-                    label = { Text("موقعیت فیزیکی در انبار (مثلا قفسه C ردیف ۲)") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(10.dp)
-                )
+                // ---- DIMENSIONS ----
+                ProductSectionHeader(title = "ابعاد و وزن (برای محاسبه هزینه پست)", icon = Icons.Filled.Straighten)
 
-                OutlinedTextField(
-                    value = imageLink,
-                    onValueChange = { imageLink = it },
-                    label = { Text("آدرس تصویری محصول") },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(10.dp)
-                )
-
-                // Package Dimensions
-                Text("ابعاد و مشخصات پستی فرستنده", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     OutlinedTextField(
                         value = length,
                         onValueChange = { length = it },
-                        label = { Text("طول (cm)") },
+                        label = { Text("طول", fontSize = 10.sp) },
+                        placeholder = { Text("cm", fontSize = 11.sp) },
                         modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(10.dp)
+                        shape = RoundedCornerShape(10.dp),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        singleLine = true
                     )
                     OutlinedTextField(
                         value = width,
                         onValueChange = { width = it },
-                        label = { Text("عرض (cm)") },
+                        label = { Text("عرض", fontSize = 10.sp) },
+                        placeholder = { Text("cm", fontSize = 11.sp) },
                         modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(10.dp)
+                        shape = RoundedCornerShape(10.dp),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        singleLine = true
                     )
                     OutlinedTextField(
                         value = height,
                         onValueChange = { height = it },
-                        label = { Text("ارتفاع (cm)") },
+                        label = { Text("ارتفاع", fontSize = 10.sp) },
+                        placeholder = { Text("cm", fontSize = 11.sp) },
                         modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(10.dp)
+                        shape = RoundedCornerShape(10.dp),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        singleLine = true
                     )
                     OutlinedTextField(
                         value = weight,
                         onValueChange = { weight = it },
-                        label = { Text("وزن (gr)") },
+                        label = { Text("وزن", fontSize = 10.sp) },
+                        placeholder = { Text("gr", fontSize = 11.sp) },
                         modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(10.dp),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        singleLine = true
+                    )
+                }
+
+                // ---- PRODUCT TYPE ----
+                ProductSectionHeader(title = "نوع و وضعیت محصول", icon = Icons.Filled.Settings)
+
+                Column(modifier = Modifier.padding(horizontal = 8.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                        Checkbox(checked = isVirtual, onCheckedChange = { isVirtual = it })
+                        Text("محصول مجازی (بدون ارسال فیزیکی)", modifier = Modifier.weight(1f), fontSize = 13.sp)
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                        Checkbox(checked = isDownloadable, onCheckedChange = { isDownloadable = it })
+                        Text("محصول دانلودی", modifier = Modifier.weight(1f), fontSize = 13.sp)
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                        Checkbox(checked = isPublish, onCheckedChange = { isPublish = it })
+                        Text("انتشار فوری (وضعیت: منتشر شده)", modifier = Modifier.weight(1f), fontSize = 13.sp)
+                    }
+                }
+
+                // ---- DESCRIPTION ----
+                ProductSectionHeader(title = "توضیحات", icon = Icons.Filled.Description)
+
+                Column(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    OutlinedTextField(
+                        value = shortDesc,
+                        onValueChange = { shortDesc = it },
+                        label = { Text("توضیح کوتاه") },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 2,
+                        maxLines = 4,
+                        shape = RoundedCornerShape(10.dp)
+                    )
+                    OutlinedTextField(
+                        value = desc,
+                        onValueChange = { desc = it },
+                        label = { Text("توضیحات کامل محصول") },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 4,
+                        maxLines = 12,
                         shape = RoundedCornerShape(10.dp)
                     )
                 }
 
-                // Attributes and details
-                Text("توضیحات و نوع عرضه کالا", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(checked = isVirtual, onCheckedChange = { isVirtual = it })
-                    Text("کالای مجازی است (بدون نیاز به ارسال فیزیکی)", fontSize = 11.sp)
-                }
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(checked = isDownloadable, onCheckedChange = { isDownloadable = it })
-                    Text("کالای دانلودی است (فول‌دانلود)", fontSize = 11.sp)
-                }
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(checked = isPublish, onCheckedChange = { isPublish = it })
-                    Text("انتقال کالا مستقیم با وضعیت معاوضه به عمومی (منتشر شده)", fontSize = 11.sp)
-                }
-
-                OutlinedTextField(
-                    value = shortDesc,
-                    onValueChange = { shortDesc = it },
-                    label = { Text("توضیحات کوتاه محصول") },
-                    modifier = Modifier.fillMaxWidth(),
-                    minLines = 2,
-                    shape = RoundedCornerShape(10.dp)
-                )
-
-                OutlinedTextField(
-                    value = desc,
-                    onValueChange = { desc = it },
-                    label = { Text("توضیحات تکمیلی کامل کالا") },
-                    modifier = Modifier.fillMaxWidth(),
-                    minLines = 4,
-                    shape = RoundedCornerShape(10.dp)
-                )
-
                 Spacer(modifier = Modifier.height(32.dp))
             }
         }
+    }
+}
+
+@Composable
+private fun ProductSectionHeader(title: String, icon: androidx.compose.ui.graphics.vector.ImageVector) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Icon(imageVector = icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+        Text(title, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = MaterialTheme.colorScheme.primary)
+        HorizontalDivider(modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.primary.copy(alpha = 0.25f))
     }
 }

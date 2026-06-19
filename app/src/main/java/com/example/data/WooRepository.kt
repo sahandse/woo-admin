@@ -2,7 +2,6 @@ package com.example.data
 
 import android.content.Context
 import android.util.Log
-import com.example.core.utils.Helpers
 import com.example.core.utils.JalaliCalendar
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -67,66 +66,24 @@ class WooRepository(private val db: AppDatabase, private val context: Context) {
         get() = sharedPrefs.getString("sms_template_status_completed", "مشتری عزیز {name}، سفارش {order_id} تکمیل و ارسال شد. با تشکر!") ?: "مشتری عزیز {name}، سفارش {order_id} تکمیل و ارسال شد. با تشکر!"
         set(value) = sharedPrefs.edit().putString("sms_template_status_completed", value).apply()
 
-    // Seeds the database with rich Persian details if they don't already exist
+    // Ensures at least one admin user exists for local login
     suspend fun seedDatabase() = withContext(Dispatchers.IO) {
         try {
-            // Seed stores
-            val stores = db.storeDao().getAllStores().firstOrNull()
-            if (stores.isNullOrEmpty()) {
-                for (store in Helpers.mockStores) {
-                    db.storeDao().insertStore(store)
-                }
-            }
-
-            // Seed products
-            val products = db.productDao().getAllProducts().firstOrNull()
-            if (products.isNullOrEmpty()) {
-                db.productDao().insertProducts(Helpers.mockProducts)
-            }
-
-            // Seed orders
-            val orders = db.orderDao().getAllOrders().firstOrNull()
-            if (orders.isNullOrEmpty()) {
-                db.orderDao().insertOrders(Helpers.mockOrders)
-            }
-
-            // Seed customers
-            val customers = db.customerDao().getAllCustomers().firstOrNull()
-            if (customers.isNullOrEmpty()) {
-                db.customerDao().insertCustomers(Helpers.mockCustomers)
-            }
-
-            // Seed coupons
-            val coupons = db.couponDao().getAllCoupons().firstOrNull()
-            if (coupons.isNullOrEmpty()) {
-                db.couponDao().insertCoupons(Helpers.mockCoupons)
-            }
-
-            // Seed notifications
-            val notifications = db.notificationDao().getAllNotifications().firstOrNull()
-            if (notifications.isNullOrEmpty()) {
-                for (notif in Helpers.mockNotifications) {
-                    db.notificationDao().insertNotification(notif)
-                }
-            }
-
-            // Seed admin users
             val admins = db.adminUserDao().getAllAdminUsers().firstOrNull()
             if (admins.isNullOrEmpty()) {
-                for (adm in Helpers.mockAdminUsers) {
-                    db.adminUserDao().insertAdminUser(adm)
-                }
-            }
-
-            // Seed activity logs
-            val activities = db.adminActivityDao().getAllActivities().firstOrNull()
-            if (activities.isNullOrEmpty()) {
-                for (act in Helpers.mockActivities) {
-                    db.adminActivityDao().insertActivity(act)
-                }
+                db.adminUserDao().insertAdminUser(
+                    AdminUser(
+                        id = 1,
+                        fullName = "مدیر سیستم",
+                        username = "admin",
+                        role = "SUPER_ADMIN",
+                        isActive = true,
+                        permissions = listOf("ALL")
+                    )
+                )
             }
         } catch (e: Exception) {
-            Log.e("WooRepository", "Failed to seed DB", e)
+            Log.e("WooRepository", "Failed to seed admin user", e)
         }
     }
 
