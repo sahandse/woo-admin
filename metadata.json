@@ -1,0 +1,6 @@
+{
+  "name": "مديريت ووکامرس",
+  "description": "اپليکيشن جامع و هوشمند مديريت فروشگاه ووکامرس به زبان فارسي و راستچين",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
