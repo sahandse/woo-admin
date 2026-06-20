@@ -2,25 +2,37 @@ package com.sahand.wooadmin.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// --- LIGHT WORKSPACE BLUE THEME ---
-val AdminBluePrimary = Color(0xFF1E40AF) // Trustworthy Cobalt
-val AdminBlueSecondary = Color(0xFF3B82F6) // Accent Sapphire
-val AdminTeal = Color(0xFF0F766E) // Administrative Greenish-Teal
-val AdminBackgroundLight = Color(0xFFF1F5F9) // Slate White background
-val AdminSurfaceLight = Color(0xFFFFFFFF) // White cards
-val AdminTextPrimaryLight = Color(0xFF0F172A) // Dark slate text
-val AdminTextSecondaryLight = Color(0xFF475569) // Lighter slate
+// --- LIGHT THEME ---
+val PrimaryIndigo     = Color(0xFF5B5FEF)   // Indigo vibrant
+val SecondaryViolet   = Color(0xFF7C3AED)   // Violet deep
+val TertiaryEmerald   = Color(0xFF059669)   // Emerald
 
-// --- DARK REGAL THEME ---
-val AdminBluePrimaryDark = Color(0xFF60A5FA) // Lighter blue accent
-val AdminBlueSecondaryDark = Color(0xFF93C5FD)
-val AdminTealDark = Color(0xFF2DD4BF)
-val AdminBackgroundDark = Color(0xFF0F172A) // Rich Charcoal-Blue slate
-val AdminSurfaceDark = Color(0xFF1E293B) // Layered gray-blue cards
-val AdminTextPrimaryDark = Color(0xFFF8FAFC) // Ice white
-val AdminTextSecondaryDark = Color(0xFF94A3B8) // Pale slate
+val BackgroundLight   = Color(0xFFF7F7FD)   // Very light lavender-white
+val SurfaceLight      = Color(0xFFFFFFFF)   // Pure white cards
+val SurfaceVarLight   = Color(0xFFF0F0FA)   // Tinted surface
+val OnPrimaryLight    = Color(0xFFFFFFFF)
+val OnSurfaceLight    = Color(0xFF1A1A2E)   // Deep ink
+val OnSurfaceVarLight = Color(0xFF6E6E9A)   // Muted purple-gray
 
-// --- SPECIFICS ---
-val GreenMoney = Color(0xFF10B981) // Success
-val RedError = Color(0xFFEF4444) // Danger
-val YellowWarn = Color(0xFFF59E0B) // Alert
+val PrimaryContainerLight  = Color(0xFFE8E8FF)  // Soft indigo chip bg
+val OnPrimaryContainerLight = Color(0xFF3730A3)
+
+// --- DARK THEME ---
+val PrimaryIndigoDark    = Color(0xFF818CF8)   // Indigo-400
+val SecondaryVioletDark  = Color(0xFFA78BFA)   // Violet-400
+val TertiaryEmeraldDark  = Color(0xFF34D399)
+
+val BackgroundDark   = Color(0xFF0D0D1A)    // Almost black-purple
+val SurfaceDark      = Color(0xFF15152A)    // Dark card
+val SurfaceVarDark   = Color(0xFF1E1E38)    // Slightly lighter dark
+val OnPrimaryDark    = Color(0xFF0D0D1A)
+val OnSurfaceDark    = Color(0xFFEEEEFF)    // Ice lavender
+val OnSurfaceVarDark = Color(0xFF9090B8)    // Muted light purple
+
+val PrimaryContainerDark  = Color(0xFF2D2D6E)
+val OnPrimaryContainerDark = Color(0xFFBEBEF8)
+
+// --- STATUS COLORS ---
+val GreenMoney = Color(0xFF10B981)
+val RedError   = Color(0xFFEF4444)
+val YellowWarn = Color(0xFFF59E0B)

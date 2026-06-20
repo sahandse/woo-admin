@@ -25,6 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.layout.navigationBarsPadding
 import com.sahand.wooadmin.ui.theme.RedError
 import com.sahand.wooadmin.ui.theme.YellowWarn
 import com.sahand.wooadmin.ui.viewmodel.WooViewModel
@@ -91,26 +92,34 @@ fun MainAppContainer(
                     TopAppBar(
                         title = {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = Icons.Default.Storefront,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .size(30.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(MaterialTheme.colorScheme.primary),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Storefront,
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(10.dp))
                                 Text(
-                                    text = "مدیریت ووکامرس",
-                                    fontSize = 17.sp,
-                                    fontWeight = FontWeight.Bold
+                                    text = "مدیریت فروشگاه",
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
                                 )
                             }
                         },
                         actions = {
-                            // Notification bell with unread badge count
+                            // Notification bell
                             Box(
                                 modifier = Modifier
-                                    .padding(end = 4.dp)
-                                    .size(44.dp)
+                                    .size(40.dp)
                                     .clip(CircleShape)
                                     .clickable { showNotifSheet = true },
                                 contentAlignment = Alignment.Center
@@ -118,14 +127,15 @@ fun MainAppContainer(
                                 Icon(
                                     imageVector = Icons.Default.Notifications,
                                     contentDescription = "اعلان‌ها",
-                                    tint = MaterialTheme.colorScheme.onSurface
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(22.dp)
                                 )
                                 if (unreadNotifs > 0) {
                                     Box(
                                         modifier = Modifier
                                             .align(Alignment.TopEnd)
-                                            .offset(x = (-4).dp, y = 4.dp)
-                                            .size(18.dp)
+                                            .offset(x = 2.dp, y = 2.dp)
+                                            .size(16.dp)
                                             .clip(CircleShape)
                                             .background(RedError),
                                         contentAlignment = Alignment.Center
@@ -133,22 +143,37 @@ fun MainAppContainer(
                                         Text(
                                             text = unreadNotifs.toString(),
                                             color = Color.White,
-                                            fontSize = 9.sp,
+                                            fontSize = 8.sp,
                                             fontWeight = FontWeight.Black
                                         )
                                     }
                                 }
                             }
-                            // Settings icon — top-left in RTL layout
-                            IconButton(onClick = { activeScreen = Screen.Settings }) {
+                            Spacer(Modifier.width(4.dp))
+                            // Settings icon
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .clickable { activeScreen = Screen.Settings },
+                                contentAlignment = Alignment.Center
+                            ) {
                                 Icon(
                                     imageVector = Icons.Default.Settings,
                                     contentDescription = "تنظیمات",
-                                    tint = MaterialTheme.colorScheme.onSurface
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(22.dp)
                                 )
                             }
+                            Spacer(Modifier.width(4.dp))
                         },
-                        colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = MaterialTheme.colorScheme.surface
+                        )
+                    )
+                    HorizontalDivider(
+                        thickness = 0.5.dp,
+                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f)
                     )
                 }
             },
@@ -234,44 +259,59 @@ fun MainAppContainer(
                             activeScreen is Screen.Tracking
 
                 if (isTab) {
-                    NavigationBar(
-                        containerColor = MaterialTheme.colorScheme.surface,
-                        tonalElevation = 8.dp
-                    ) {
-                        NavigationBarItem(
-                            selected = activeScreen is Screen.Dashboard,
-                            onClick = { activeScreen = Screen.Dashboard },
-                            icon = { Icon(imageVector = Icons.Default.SpaceDashboard, contentDescription = "داشبورد") },
-                            label = { Text("داشبورد", fontSize = 10.sp, fontWeight = FontWeight.Bold) }
+                    Column {
+                        HorizontalDivider(
+                            thickness = 0.5.dp,
+                            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
                         )
-
-                        NavigationBarItem(
-                            selected = activeScreen is Screen.Orders,
-                            onClick = { activeScreen = Screen.Orders },
-                            icon = { Icon(imageVector = Icons.Default.ReceiptLong, contentDescription = "سفارش‌ها") },
-                            label = { Text("سفارش‌ها", fontSize = 10.sp, fontWeight = FontWeight.Bold) }
-                        )
-
-                        NavigationBarItem(
-                            selected = activeScreen is Screen.Products,
-                            onClick = { activeScreen = Screen.Products },
-                            icon = { Icon(imageVector = Icons.Default.LocalMall, contentDescription = "کالاها") },
-                            label = { Text("محصولات", fontSize = 10.sp, fontWeight = FontWeight.Bold) }
-                        )
-
-                        NavigationBarItem(
-                            selected = activeScreen is Screen.Customers,
-                            onClick = { activeScreen = Screen.Customers },
-                            icon = { Icon(imageVector = Icons.Default.People, contentDescription = "مشتریان") },
-                            label = { Text("مشتریان", fontSize = 10.sp, fontWeight = FontWeight.Bold) }
-                        )
-
-                        NavigationBarItem(
-                            selected = activeScreen is Screen.Tracking,
-                            onClick = { activeScreen = Screen.Tracking },
-                            icon = { Icon(imageVector = Icons.Default.TrackChanges, contentDescription = "رهگیری") },
-                            label = { Text("رهگیری", fontSize = 10.sp, fontWeight = FontWeight.Bold) }
-                        )
+                        NavigationBar(
+                            containerColor = MaterialTheme.colorScheme.surface,
+                            tonalElevation = 0.dp,
+                            modifier = Modifier.height(64.dp)
+                        ) {
+                            val navItemColors = NavigationBarItemDefaults.colors(
+                                selectedIconColor   = MaterialTheme.colorScheme.primary,
+                                selectedTextColor   = MaterialTheme.colorScheme.primary,
+                                indicatorColor      = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f),
+                                unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                                unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
+                            )
+                            NavigationBarItem(
+                                selected = activeScreen is Screen.Dashboard,
+                                onClick = { activeScreen = Screen.Dashboard },
+                                colors = navItemColors,
+                                icon = { Icon(Icons.Default.SpaceDashboard, null, modifier = Modifier.size(22.dp)) },
+                                label = { Text("داشبورد", fontSize = 10.sp) }
+                            )
+                            NavigationBarItem(
+                                selected = activeScreen is Screen.Orders,
+                                onClick = { activeScreen = Screen.Orders },
+                                colors = navItemColors,
+                                icon = { Icon(Icons.Default.ReceiptLong, null, modifier = Modifier.size(22.dp)) },
+                                label = { Text("سفارش‌ها", fontSize = 10.sp) }
+                            )
+                            NavigationBarItem(
+                                selected = activeScreen is Screen.Products,
+                                onClick = { activeScreen = Screen.Products },
+                                colors = navItemColors,
+                                icon = { Icon(Icons.Default.LocalMall, null, modifier = Modifier.size(22.dp)) },
+                                label = { Text("محصولات", fontSize = 10.sp) }
+                            )
+                            NavigationBarItem(
+                                selected = activeScreen is Screen.Customers,
+                                onClick = { activeScreen = Screen.Customers },
+                                colors = navItemColors,
+                                icon = { Icon(Icons.Default.People, null, modifier = Modifier.size(22.dp)) },
+                                label = { Text("مشتریان", fontSize = 10.sp) }
+                            )
+                            NavigationBarItem(
+                                selected = activeScreen is Screen.Tracking,
+                                onClick = { activeScreen = Screen.Tracking },
+                                colors = navItemColors,
+                                icon = { Icon(Icons.Default.TrackChanges, null, modifier = Modifier.size(22.dp)) },
+                                label = { Text("رهگیری", fontSize = 10.sp) }
+                            )
+                        }
                     }
                 }
             }
