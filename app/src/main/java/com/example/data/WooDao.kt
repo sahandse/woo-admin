@@ -65,6 +65,9 @@ interface OrderDao {
     @Query("SELECT id FROM woo_orders")
     suspend fun getAllOrderIds(): List<Long>
 
+    @Query("DELETE FROM woo_orders WHERE id = :orderId")
+    suspend fun deleteOrderById(orderId: Long)
+
     @Query("DELETE FROM woo_orders")
     suspend fun clearAllOrders()
 }
@@ -97,6 +100,9 @@ interface ProductDao {
 
     @Query("DELETE FROM woo_products WHERE id = :productId")
     suspend fun deleteProduct(productId: Long)
+
+    @Query("SELECT id FROM woo_products")
+    suspend fun getAllProductIds(): List<Long>
 
     @Query("DELETE FROM woo_products")
     suspend fun clearAllProducts()

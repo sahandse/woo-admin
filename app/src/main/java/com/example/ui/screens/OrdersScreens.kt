@@ -9,6 +9,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -521,7 +522,18 @@ fun OrderDetailsScreen(
 
     var showTrackingDialog by remember { mutableStateOf(false) }
     var trackingCodeInput by remember { mutableStateOf(order?.trackingCode ?: "") }
-    var trackingCompanyInput by remember { mutableStateOf(order?.shippingCompany ?: "پست جمهوری اسلامی") }
+    // Store carrier key: POST, TIPAX, SNAP, CHAPAR, OTHER
+    var selectedCarrierKey by remember {
+        mutableStateOf(
+            when {
+                order?.shippingCompany?.contains("تیپاکس", ignoreCase = true) == true -> "TIPAX"
+                order?.shippingCompany?.contains("اسنپ", ignoreCase = true) == true -> "SNAP"
+                order?.shippingCompany?.contains("چاپار", ignoreCase = true) == true -> "CHAPAR"
+                order?.shippingCompany?.contains("ماهکس", ignoreCase = true) == true -> "MAHEX"
+                else -> "POST"
+            }
+        )
+    }
 
     var adminNoteInput by remember { mutableStateOf(order?.adminNotes ?: "") }
 
@@ -1015,23 +1027,78 @@ fun OrderDetailsScreen(
                     Card(
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                     ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
+                        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text("رهگیری و مرسولات", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                Text("رهگیری مرسوله", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                                 IconButton(onClick = { showTrackingDialog = true }) {
-                                    Icon(imageVector = Icons.Default.Edit, contentDescription = "ویرایش")
+                                    Icon(Icons.Default.Edit, contentDescription = "ثبت/ویرایش")
                                 }
                             }
 
                             if (order.trackingCode.isNotBlank()) {
-                                Text("خط رهگیری: ${order.trackingCode}", fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                                Text("فرستنده: ${order.shippingCompany}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                                val carrierName = carrierDisplayName(selectedCarrierKey).ifBlank { order.shippingCompany }
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f))
+                                        .padding(10.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column {
+                                        Text(carrierName, fontSize = 11.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+                                        Text(order.trackingCode, fontSize = 14.sp, fontWeight = FontWeight.Bold, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
+                                    }
+                                    IconButton(
+                                        onClick = {
+                                            val clipboard = context.getSystemService(android.content.ClipboardManager::class.java)
+                                            clipboard?.setPrimaryClip(android.content.ClipData.newPlainText("tracking", order.trackingCode))
+                                            Toast.makeText(context, "کد کپی شد", Toast.LENGTH_SHORT).show()
+                                        }
+                                    ) { Icon(Icons.Default.ContentCopy, null, tint = MaterialTheme.colorScheme.primary) }
+                                }
+                                // Open tracking URL button
+                                val trackingUrl = buildTrackingUrl(selectedCarrierKey, order.trackingCode)
+                                if (trackingUrl != null) {
+                                    Button(
+                                        onClick = {
+                                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(trackingUrl))
+                                            context.startActivity(intent)
+                                        },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = RoundedCornerShape(10.dp),
+                                        contentPadding = PaddingValues(vertical = 10.dp)
+                                    ) {
+                                        Icon(Icons.Default.TrackChanges, null, modifier = Modifier.size(18.dp))
+                                        Spacer(Modifier.width(8.dp))
+                                        Text("رهگیری آنلاین در سایت $carrierName", fontSize = 13.sp)
+                                    }
+                                } else {
+                                    OutlinedButton(
+                                        onClick = { showTrackingDialog = true },
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = RoundedCornerShape(10.dp)
+                                    ) {
+                                        Icon(Icons.Default.Edit, null, modifier = Modifier.size(16.dp))
+                                        Spacer(Modifier.width(6.dp))
+                                        Text("ویرایش اطلاعات مرسوله", fontSize = 13.sp)
+                                    }
+                                }
                             } else {
-                                Text("هیچ کد رهگیری ثبت نشده است.", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f))
+                                OutlinedButton(
+                                    onClick = { showTrackingDialog = true },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
+                                    Icon(Icons.Default.Add, null, modifier = Modifier.size(16.dp))
+                                    Spacer(Modifier.width(6.dp))
+                                    Text("ثبت کد رهگیری", fontSize = 13.sp)
+                                }
                             }
                         }
                     }
@@ -1106,33 +1173,65 @@ fun OrderDetailsScreen(
             if (showTrackingDialog) {
                 AlertDialog(
                     onDismissRequest = { showTrackingDialog = false },
-                    title = { Text("ثبت مرسوله و کد رهگیری") },
+                    title = { Text("ثبت کد رهگیری") },
                     text = {
-                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Text("شرکت حمل و نقل را انتخاب کنید:", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                            // Carrier selection chips
+                            val carriers = listOf(
+                                "POST" to "پست",
+                                "TIPAX" to "تیپاکس",
+                                "SNAP" to "اسنپ",
+                                "CHAPAR" to "چاپار",
+                                "MAHEX" to "ماهکس",
+                                "OTHER" to "سایر"
+                            )
+                            androidx.compose.foundation.lazy.LazyRow(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                items(carriers) { (key, label) ->
+                                    val selected = selectedCarrierKey == key
+                                    FilterChip(
+                                        selected = selected,
+                                        onClick = { selectedCarrierKey = key },
+                                        label = { Text(label, fontSize = 12.sp) },
+                                        colors = FilterChipDefaults.filterChipColors(
+                                            selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                            selectedLabelColor = Color.White
+                                        )
+                                    )
+                                }
+                            }
                             OutlinedTextField(
                                 value = trackingCodeInput,
                                 onValueChange = { trackingCodeInput = it },
-                                label = { Text("کد رهگیری پستی (۲۴ رقمی)") },
-                                modifier = Modifier.fillMaxWidth()
+                                label = { Text("کد رهگیری") },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                shape = RoundedCornerShape(10.dp),
+                                leadingIcon = { Icon(Icons.Default.QrCode, null, modifier = Modifier.size(18.dp)) }
                             )
-
-                            OutlinedTextField(
-                                value = trackingCompanyInput,
-                                onValueChange = { trackingCompanyInput = it },
-                                label = { Text("شرکت حمل و نقل یا باربری") },
-                                modifier = Modifier.fillMaxWidth()
-                            )
+                            // Preview URL
+                            val previewUrl = buildTrackingUrl(selectedCarrierKey, trackingCodeInput)
+                            if (previewUrl != null && trackingCodeInput.isNotBlank()) {
+                                Text(
+                                    "🔗 $previewUrl",
+                                    fontSize = 10.sp,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
                         }
                     },
                     confirmButton = {
                         Button(
                             onClick = {
-                                viewModel.addOrderTracking(order.id, trackingCodeInput, trackingCompanyInput)
+                                val carrierName = carrierDisplayName(selectedCarrierKey)
+                                viewModel.addOrderTracking(order.id, trackingCodeInput.trim(), carrierName)
                                 showTrackingDialog = false
                             }
-                        ) {
-                            Text("ذخیره")
-                        }
+                        ) { Text("ذخیره") }
                     },
                     dismissButton = {
                         TextButton(onClick = { showTrackingDialog = false }) { Text("انصراف") }
@@ -1338,5 +1437,26 @@ fun ShippingLabelView(order: WooOrder, onBack: () -> Unit) {
                 }
             }
         }
+    }
+}
+
+private fun carrierDisplayName(key: String): String = when (key) {
+    "POST" -> "پست جمهوری اسلامی"
+    "TIPAX" -> "تیپاکس"
+    "SNAP" -> "اسنپ اکسپرس"
+    "CHAPAR" -> "چاپار"
+    "MAHEX" -> "ماهکس"
+    else -> "سایر"
+}
+
+private fun buildTrackingUrl(carrierKey: String, code: String): String? {
+    if (code.isBlank()) return null
+    return when (carrierKey) {
+        "POST" -> "https://tracking.post.ir/search.aspx?id=$code"
+        "TIPAX" -> "https://tipax.com.ir/fa/barcode/baarcodeInquiry/$code"
+        "SNAP" -> "https://snapexpress.ir/"
+        "CHAPAR" -> "https://chapar.ir/"
+        "MAHEX" -> "https://mahex.com/"
+        else -> null
     }
 }

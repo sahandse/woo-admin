@@ -140,19 +140,32 @@ fun SettingsScreen(
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                         )
                     }
-                    Button(
-                        onClick = { viewModel.syncAllData() },
-                        enabled = !isSyncing,
-                        shape = RoundedCornerShape(10.dp),
-                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
-                    ) {
-                        if (isSyncing) {
-                            CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
-                        } else {
-                            Icon(imageVector = Icons.Default.Sync, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = { viewModel.syncAllData() },
+                            enabled = !isSyncing,
+                            shape = RoundedCornerShape(10.dp),
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
+                        ) {
+                            if (isSyncing) {
+                                CircularProgressIndicator(modifier = Modifier.size(14.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
+                            } else {
+                                Icon(imageVector = Icons.Default.Sync, contentDescription = null, modifier = Modifier.size(16.dp))
+                            }
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(if (isSyncing) "در حال بروزرسانی" else "همگام‌سازی", fontSize = 12.sp)
                         }
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(if (isSyncing) "در حال همگام‌سازی" else "همگام‌سازی", fontSize = 12.sp)
+                        OutlinedButton(
+                            onClick = { viewModel.smartClean() },
+                            enabled = !isSyncing,
+                            shape = RoundedCornerShape(10.dp),
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                        ) {
+                            Icon(imageVector = Icons.Default.AutoDelete, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("هوشمند پاک کن", fontSize = 12.sp)
+                        }
                     }
                 }
 

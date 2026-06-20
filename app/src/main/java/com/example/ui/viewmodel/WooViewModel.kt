@@ -195,6 +195,30 @@ class WooViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun smartClean() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val activeStore = db.storeDao().getActiveStore() ?: run {
+                _syncMessage.value = "هیچ فروشگاهی متصل نیست"
+                return@launch
+            }
+            _isSyncing.value = true
+            try {
+                val result = WooCommerceSync.smartCleanStale(
+                    db = db,
+                    baseUrl = activeStore.url,
+                    consumerKey = activeStore.consumerKey,
+                    consumerSecret = activeStore.consumerSecret,
+                    onProgress = { msg -> _syncMessage.value = msg }
+                )
+                _syncMessage.value = "پاکسازی کامل شد: ${result.productsRemoved} محصول و ${result.ordersRemoved} سفارش حذف شدند"
+            } catch (e: Exception) {
+                _syncMessage.value = "خطا در پاکسازی: ${e.localizedMessage}"
+            } finally {
+                _isSyncing.value = false
+            }
+        }
+    }
+
     fun syncOrdersNow() {
         viewModelScope.launch(Dispatchers.IO) {
             val activeStore = db.storeDao().getActiveStore() ?: return@launch

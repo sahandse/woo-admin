@@ -356,6 +356,41 @@ object WooCommerceSync {
         expiryJalali = dto.dateExpires ?: ""
     )
 
+    data class SmartCleanResult(val productsRemoved: Int, val ordersRemoved: Int)
+
+    suspend fun smartCleanStale(
+        db: AppDatabase,
+        baseUrl: String,
+        consumerKey: String,
+        consumerSecret: String,
+        onProgress: (String) -> Unit
+    ): SmartCleanResult = withContext(Dispatchers.IO) {
+        val api = buildApi(baseUrl, consumerKey, consumerSecret)
+
+        onProgress("دریافت لیست محصولات از سایت...")
+        val wcProductIds = try {
+            api.getProducts(perPage = 100).map { it.id }.toSet()
+        } catch (e: Exception) { emptySet() }
+
+        val localProductIds = db.productDao().getAllProductIds()
+        // Only remove WC-origin products (IDs < 1 billion, locally-created have timestamp IDs)
+        val staleProducts = localProductIds.filter { it < 1_000_000_000L && it !in wcProductIds }
+        staleProducts.forEach { db.productDao().deleteProduct(it) }
+        onProgress("${staleProducts.size} محصول قدیمی پاک شد")
+
+        onProgress("دریافت لیست سفارش‌ها از سایت...")
+        val wcOrderIds = try {
+            api.getOrders(perPage = 100).map { it.id }.toSet()
+        } catch (e: Exception) { emptySet() }
+
+        val localOrderIds = db.orderDao().getAllOrderIds().toSet()
+        val staleOrders = localOrderIds.filter { it < 1_000_000_000L && it !in wcOrderIds }
+        staleOrders.forEach { db.orderDao().deleteOrderById(it) }
+        onProgress("${staleOrders.size} سفارش قدیمی پاک شد")
+
+        SmartCleanResult(staleProducts.size, staleOrders.size)
+    }
+
     suspend fun syncOrdersOnly(
         db: AppDatabase,
         baseUrl: String,
