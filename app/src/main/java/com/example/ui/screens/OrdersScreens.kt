@@ -1440,6 +1440,259 @@ fun ShippingLabelView(order: WooOrder, onBack: () -> Unit) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TrackingScreen(
+    viewModel: WooViewModel,
+    onNavigateToOrderDetails: (Long) -> Unit
+) {
+    val orders by viewModel.orders.collectAsState()
+    val context = LocalContext.current
+    var selectedTab by remember { mutableStateOf(0) } // 0 = پست, 1 = تیپاکس
+
+    val carriers = listOf("POST" to "پست جمهوری اسلامی", "TIPAX" to "تیپاکس")
+
+    val postOrders = remember(orders) {
+        orders.filter { it.trackingCode.isNotBlank() && it.shippingCompany.equals("POST", ignoreCase = true) }
+            .sortedByDescending { it.id }
+    }
+    val tipaxOrders = remember(orders) {
+        orders.filter { it.trackingCode.isNotBlank() && it.shippingCompany.equals("TIPAX", ignoreCase = true) }
+            .sortedByDescending { it.id }
+    }
+
+    val currentOrders = if (selectedTab == 0) postOrders else tipaxOrders
+    val currentCarrierKey = carriers[selectedTab].first
+
+    var manualCode by remember(selectedTab) { mutableStateOf("") }
+
+    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text("رهگیری مرسوله‌ها", fontWeight = FontWeight.Bold) }
+                )
+            }
+        ) { padding ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+            ) {
+                // دو تب پست / تیپاکس
+                TabRow(
+                    selectedTabIndex = selectedTab,
+                    containerColor = MaterialTheme.colorScheme.surface
+                ) {
+                    carriers.forEachIndexed { index, (_, label) ->
+                        Tab(
+                            selected = selectedTab == index,
+                            onClick = { selectedTab = index },
+                            text = { Text(label, fontSize = 13.sp, fontWeight = FontWeight.SemiBold) },
+                            icon = {
+                                Icon(
+                                    if (index == 0) Icons.Default.LocalPostOffice else Icons.Default.LocalShipping,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        )
+                    }
+                }
+
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    // ورود دستی کد رهگیری
+                    item {
+                        Card(
+                            shape = RoundedCornerShape(14.dp),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Text(
+                                    "رهگیری دستی",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                OutlinedTextField(
+                                    value = manualCode,
+                                    onValueChange = { manualCode = it },
+                                    placeholder = { Text("کد رهگیری را وارد کنید") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(10.dp),
+                                    singleLine = true,
+                                    trailingIcon = {
+                                        if (manualCode.isNotBlank()) {
+                                            IconButton(onClick = { manualCode = "" }) {
+                                                Icon(Icons.Default.Clear, null)
+                                            }
+                                        }
+                                    }
+                                )
+                                Button(
+                                    onClick = {
+                                        val url = buildTrackingUrl(currentCarrierKey, manualCode.trim())
+                                        if (url != null) {
+                                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+                                        } else {
+                                            Toast.makeText(context, "کد رهگیری را وارد کنید", Toast.LENGTH_SHORT).show()
+                                        }
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(10.dp),
+                                    contentPadding = PaddingValues(vertical = 12.dp)
+                                ) {
+                                    Icon(Icons.Default.TrackChanges, null, modifier = Modifier.size(18.dp))
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("رهگیری در سایت ${carriers[selectedTab].second}", fontSize = 13.sp)
+                                }
+                            }
+                        }
+                    }
+
+                    // سفارش‌های این پیک
+                    if (currentOrders.isNotEmpty()) {
+                        item {
+                            Text(
+                                "${currentOrders.size} سفارش با کد رهگیری ${carriers[selectedTab].second}",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        items(currentOrders) { order ->
+                            val trackingUrl = buildTrackingUrl(currentCarrierKey, order.trackingCode)
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(14.dp),
+                                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(14.dp),
+                                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column {
+                                            Text(
+                                                "سفارش #${order.orderNumber}",
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 14.sp
+                                            )
+                                            Text(
+                                                order.customerName,
+                                                fontSize = 12.sp,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                        Text(
+                                            order.createdAtJalali,
+                                            fontSize = 11.sp,
+                                            color = MaterialTheme.colorScheme.outline
+                                        )
+                                    }
+
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            order.trackingCode,
+                                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 14.sp
+                                        )
+                                        IconButton(
+                                            onClick = {
+                                                val clipboard = context.getSystemService(android.content.ClipboardManager::class.java)
+                                                clipboard?.setPrimaryClip(
+                                                    android.content.ClipData.newPlainText("tracking", order.trackingCode)
+                                                )
+                                                Toast.makeText(context, "کد کپی شد", Toast.LENGTH_SHORT).show()
+                                            },
+                                            modifier = Modifier.size(32.dp)
+                                        ) {
+                                            Icon(Icons.Default.ContentCopy, null, modifier = Modifier.size(18.dp))
+                                        }
+                                    }
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        if (trackingUrl != null) {
+                                            Button(
+                                                onClick = {
+                                                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(trackingUrl)))
+                                                },
+                                                modifier = Modifier.weight(1f),
+                                                shape = RoundedCornerShape(10.dp),
+                                                contentPadding = PaddingValues(vertical = 10.dp)
+                                            ) {
+                                                Icon(Icons.Default.TrackChanges, null, modifier = Modifier.size(16.dp))
+                                                Spacer(Modifier.width(6.dp))
+                                                Text("رهگیری آنلاین", fontSize = 13.sp)
+                                            }
+                                        }
+                                        OutlinedButton(
+                                            onClick = { onNavigateToOrderDetails(order.id) },
+                                            modifier = Modifier.weight(1f),
+                                            shape = RoundedCornerShape(10.dp),
+                                            contentPadding = PaddingValues(vertical = 10.dp)
+                                        ) {
+                                            Icon(Icons.Default.OpenInNew, null, modifier = Modifier.size(16.dp))
+                                            Spacer(Modifier.width(6.dp))
+                                            Text("سفارش", fontSize = 13.sp)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 24.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Icon(
+                                        if (selectedTab == 0) Icons.Default.LocalPostOffice else Icons.Default.LocalShipping,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(48.dp),
+                                        tint = MaterialTheme.colorScheme.outline
+                                    )
+                                    Spacer(Modifier.height(8.dp))
+                                    Text(
+                                        "هیچ سفارشی با ${carriers[selectedTab].second} ثبت نشده",
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        fontSize = 13.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 private fun carrierDisplayName(key: String): String = when (key) {
     "POST" -> "پست جمهوری اسلامی"
     "TIPAX" -> "تیپاکس"
@@ -1453,7 +1706,7 @@ private fun buildTrackingUrl(carrierKey: String, code: String): String? {
     if (code.isBlank()) return null
     return when (carrierKey) {
         "POST" -> "https://tracking.post.ir/search.aspx?id=$code"
-        "TIPAX" -> "https://tipax.com.ir/fa/barcode/baarcodeInquiry/$code"
+        "TIPAX" -> "https://tipax.com.ir/fa/barcode/barcodeInquiry/$code"
         "SNAP" -> "https://snapexpress.ir/"
         "CHAPAR" -> "https://chapar.ir/"
         "MAHEX" -> "https://mahex.com/"

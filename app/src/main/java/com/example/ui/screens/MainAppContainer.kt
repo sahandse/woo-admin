@@ -46,6 +46,8 @@ sealed class Screen {
     object AdminUsers : Screen()
     object CreateOrder : Screen()
     object InventoryManagement : Screen()
+    object Tracking : Screen()
+    object SmartClean : Screen()
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -82,7 +84,8 @@ fun MainAppContainer(
                             activeScreen is Screen.Products ||
                             activeScreen is Screen.Customers ||
                             activeScreen is Screen.AiAnalyst ||
-                            activeScreen is Screen.Settings
+                            activeScreen is Screen.Settings ||
+                            activeScreen is Screen.Tracking
 
                 if (isTab) {
                     TopAppBar(
@@ -222,7 +225,8 @@ fun MainAppContainer(
                             activeScreen is Screen.Products ||
                             activeScreen is Screen.Customers ||
                             activeScreen is Screen.AiAnalyst ||
-                            activeScreen is Screen.Settings
+                            activeScreen is Screen.Settings ||
+                            activeScreen is Screen.Tracking
 
                 if (isTab) {
                     NavigationBar(
@@ -262,6 +266,13 @@ fun MainAppContainer(
                             onClick = { activeScreen = Screen.AiAnalyst },
                             icon = { Icon(imageVector = Icons.Default.AutoAwesome, contentDescription = "هوش مصنوعی") },
                             label = { Text("هوشمند", fontSize = 10.sp, fontWeight = FontWeight.Bold) }
+                        )
+
+                        NavigationBarItem(
+                            selected = activeScreen is Screen.Tracking,
+                            onClick = { activeScreen = Screen.Tracking },
+                            icon = { Icon(imageVector = Icons.Default.TrackChanges, contentDescription = "رهگیری") },
+                            label = { Text("رهگیری", fontSize = 10.sp, fontWeight = FontWeight.Bold) }
                         )
 
                         NavigationBarItem(
@@ -389,6 +400,19 @@ fun MainAppContainer(
                             viewModel = viewModel,
                             onBack = { activeScreen = Screen.Products }
                         )
+                    }
+
+                    is Screen.Tracking -> {
+                        TrackingScreen(
+                            viewModel = viewModel,
+                            onNavigateToOrderDetails = { orderId ->
+                                activeScreen = Screen.OrderDetails(orderId)
+                            }
+                        )
+                    }
+
+                    is Screen.SmartClean -> {
+                        SmartCleanScreen(viewModel = viewModel)
                     }
                 }
             }
