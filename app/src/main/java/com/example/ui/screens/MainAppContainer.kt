@@ -83,7 +83,6 @@ fun MainAppContainer(
                             activeScreen is Screen.Orders ||
                             activeScreen is Screen.Products ||
                             activeScreen is Screen.Customers ||
-                            activeScreen is Screen.AiAnalyst ||
                             activeScreen is Screen.Settings ||
                             activeScreen is Screen.Tracking
 
@@ -148,8 +147,7 @@ fun MainAppContainer(
                 val isTab = activeScreen is Screen.Dashboard ||
                             activeScreen is Screen.Orders ||
                             activeScreen is Screen.Products ||
-                            activeScreen is Screen.Customers ||
-                            activeScreen is Screen.AiAnalyst
+                            activeScreen is Screen.Customers
                 if (isTab) {
                     Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         AnimatedVisibility(
@@ -224,7 +222,6 @@ fun MainAppContainer(
                             activeScreen is Screen.Orders ||
                             activeScreen is Screen.Products ||
                             activeScreen is Screen.Customers ||
-                            activeScreen is Screen.AiAnalyst ||
                             activeScreen is Screen.Settings ||
                             activeScreen is Screen.Tracking
 
@@ -259,13 +256,6 @@ fun MainAppContainer(
                             onClick = { activeScreen = Screen.Customers },
                             icon = { Icon(imageVector = Icons.Default.People, contentDescription = "مشتریان") },
                             label = { Text("مشتریان", fontSize = 10.sp, fontWeight = FontWeight.Bold) }
-                        )
-
-                        NavigationBarItem(
-                            selected = activeScreen is Screen.AiAnalyst,
-                            onClick = { activeScreen = Screen.AiAnalyst },
-                            icon = { Icon(imageVector = Icons.Default.AutoAwesome, contentDescription = "هوش مصنوعی") },
-                            label = { Text("هوشمند", fontSize = 10.sp, fontWeight = FontWeight.Bold) }
                         )
 
                         NavigationBarItem(
