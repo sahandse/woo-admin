@@ -30,7 +30,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.sahand.wooadmin.ui.theme.AdminBluePrimary
 import com.sahand.wooadmin.ui.theme.RedError
 import com.sahand.wooadmin.ui.viewmodel.WooViewModel
 
