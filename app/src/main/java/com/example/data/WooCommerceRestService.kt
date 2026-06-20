@@ -12,7 +12,11 @@ import okhttp3.Credentials
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
+import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
+import retrofit2.http.POST
+import retrofit2.http.PUT
 import retrofit2.http.Path
 import retrofit2.http.Query
 import java.security.SecureRandom
@@ -168,10 +172,57 @@ data class WcCouponDto(
     @Json(name = "status") val status: String = "publish"
 )
 
+// --- Write Request DTOs ---
+
+@JsonClass(generateAdapter = true)
+data class WcCreateProductDto(
+    val name: String = "",
+    val type: String = "simple",
+    val status: String = "publish",
+    val description: String = "",
+    @Json(name = "short_description") val shortDescription: String = "",
+    @Json(name = "regular_price") val regularPrice: String = "0",
+    @Json(name = "sale_price") val salePrice: String = "",
+    val sku: String = "",
+    @Json(name = "manage_stock") val manageStock: Boolean = false,
+    @Json(name = "stock_quantity") val stockQuantity: Int? = null,
+    @Json(name = "stock_status") val stockStatus: String = "instock",
+    val featured: Boolean = false,
+    val virtual: Boolean = false,
+    val downloadable: Boolean = false,
+    val categories: List<WcTermIdDto> = emptyList(),
+    val images: List<WcImageDto> = emptyList(),
+    val weight: String = "",
+    val attributes: List<WcAttributeRequestDto> = emptyList()
+)
+
+@JsonClass(generateAdapter = true)
+data class WcTermIdDto(val id: Long = 0)
+
+@JsonClass(generateAdapter = true)
+data class WcAttributeRequestDto(
+    val name: String = "",
+    val visible: Boolean = true,
+    val variation: Boolean = true,
+    val options: List<String> = emptyList()
+)
+
+@JsonClass(generateAdapter = true)
+data class WcOrderUpdateDto(val status: String = "")
+
 // --- Retrofit Interface ---
 interface WooCommerceRestApi {
     @GET("wp-json/wc/v3/products")
     suspend fun getProducts(@Query("per_page") perPage: Int = 100, @Query("page") page: Int = 1): List<WcProductDto>
+
+    @POST("wp-json/wc/v3/products")
+    suspend fun createProduct(@Body product: WcCreateProductDto): WcProductDto
+
+    @PUT("wp-json/wc/v3/products/{id}")
+    suspend fun updateProduct(@Path("id") id: Long, @Body product: WcCreateProductDto): WcProductDto
+
+    @DELETE("wp-json/wc/v3/products/{id}")
+    suspend fun deleteProduct(@Path("id") id: Long, @Query("force") force: Boolean = true): WcProductDto
 
     @GET("wp-json/wc/v3/products/{id}/variations")
     suspend fun getVariations(@Path("id") productId: Long, @Query("per_page") perPage: Int = 100): List<WcVariationDto>
@@ -181,6 +232,9 @@ interface WooCommerceRestApi {
 
     @GET("wp-json/wc/v3/orders")
     suspend fun getOrders(@Query("per_page") perPage: Int = 100, @Query("page") page: Int = 1): List<WcOrderDto>
+
+    @PUT("wp-json/wc/v3/orders/{id}")
+    suspend fun updateOrder(@Path("id") id: Long, @Body update: WcOrderUpdateDto): WcOrderDto
 
     @GET("wp-json/wc/v3/customers")
     suspend fun getCustomers(@Query("per_page") perPage: Int = 100, @Query("page") page: Int = 1): List<WcCustomerDto>
@@ -491,5 +545,117 @@ object WooCommerceSync {
             Log.w("WooSync", "Coupons sync failed: ${e.message}")
             onProgress("دریافت کوپن‌ها با مشکل مواجه شد")
         }
+    }
+
+    // --- Write Operations (send changes to WooCommerce) ---
+
+    private fun buildProductDto(product: WooProduct, categoryMap: Map<String, Long>): WcCreateProductDto {
+        val type = when {
+            product.colors.isNotEmpty() || product.sizes.isNotEmpty() -> "variable"
+            product.externalUrl.isNotBlank() -> "external"
+            else -> "simple"
+        }
+        val catIds = product.categories
+            .split(",").map { it.trim() }.filter { it.isNotBlank() }
+            .mapNotNull { name -> categoryMap[name] }
+            .map { WcTermIdDto(id = it) }
+        val attrs = mutableListOf<WcAttributeRequestDto>()
+        if (product.colors.isNotEmpty())
+            attrs.add(WcAttributeRequestDto(name = product.colorAttributeName, variation = true, options = product.colors))
+        if (product.sizes.isNotEmpty())
+            attrs.add(WcAttributeRequestDto(name = product.sizeAttributeName, variation = true, options = product.sizes))
+        val images = if (product.mainImage.isNotBlank()) listOf(WcImageDto(src = product.mainImage)) else emptyList()
+
+        return WcCreateProductDto(
+            name = product.name,
+            type = type,
+            status = product.status,
+            description = product.description,
+            shortDescription = product.shortDescription,
+            regularPrice = product.regularPrice.toString(),
+            salePrice = if (product.salePrice > 0) product.salePrice.toString() else "",
+            sku = product.sku,
+            manageStock = product.manageStock,
+            stockQuantity = if (product.manageStock) product.stockQuantity else null,
+            stockStatus = if (product.inStock) "instock" else "outofstock",
+            featured = product.isFeatured,
+            virtual = product.isVirtual,
+            downloadable = product.isDownloadable,
+            categories = catIds,
+            images = images,
+            weight = if (product.weight > 0) product.weight.toString() else "",
+            attributes = attrs
+        )
+    }
+
+    suspend fun createProductOnWC(
+        db: AppDatabase,
+        baseUrl: String,
+        consumerKey: String,
+        consumerSecret: String,
+        product: WooProduct,
+        trustAll: Boolean = false
+    ): WooProduct = withContext(Dispatchers.IO) {
+        val api = buildApi(baseUrl, consumerKey, consumerSecret, trustAll)
+        val categoryMap = db.categoryDao().getAllCategoriesList().associate { it.name to it.id }
+        val dto = buildProductDto(product, categoryMap)
+        val created = api.createProduct(dto)
+        val mapped = mapProduct(created)
+        db.productDao().insertProduct(mapped)
+        mapped
+    }
+
+    suspend fun updateProductOnWC(
+        db: AppDatabase,
+        baseUrl: String,
+        consumerKey: String,
+        consumerSecret: String,
+        product: WooProduct,
+        trustAll: Boolean = false
+    ): WooProduct = withContext(Dispatchers.IO) {
+        val api = buildApi(baseUrl, consumerKey, consumerSecret, trustAll)
+        val categoryMap = db.categoryDao().getAllCategoriesList().associate { it.name to it.id }
+        val dto = buildProductDto(product, categoryMap)
+        val updated = api.updateProduct(product.id, dto)
+        val mapped = mapProduct(updated)
+        db.productDao().insertProduct(mapped)
+        mapped
+    }
+
+    suspend fun deleteProductOnWC(
+        db: AppDatabase,
+        baseUrl: String,
+        consumerKey: String,
+        consumerSecret: String,
+        productId: Long,
+        trustAll: Boolean = false
+    ) = withContext(Dispatchers.IO) {
+        val api = buildApi(baseUrl, consumerKey, consumerSecret, trustAll)
+        api.deleteProduct(productId)
+        db.productDao().deleteProduct(productId)
+    }
+
+    suspend fun updateOrderStatusOnWC(
+        db: AppDatabase,
+        baseUrl: String,
+        consumerKey: String,
+        consumerSecret: String,
+        orderId: Long,
+        statusEnum: String,
+        trustAll: Boolean = false
+    ) = withContext(Dispatchers.IO) {
+        val wcStatus = when (statusEnum) {
+            "PROCESSING"      -> "processing"
+            "PENDING_PAYMENT" -> "pending"
+            "ON_HOLD"         -> "on-hold"
+            "COMPLETED"       -> "completed"
+            "CANCELLED"       -> "cancelled"
+            "REFUNDED"        -> "refunded"
+            "FAILED"          -> "failed"
+            else              -> statusEnum.lowercase().replace("_", "-")
+        }
+        val api = buildApi(baseUrl, consumerKey, consumerSecret, trustAll)
+        api.updateOrder(orderId, WcOrderUpdateDto(status = wcStatus))
+        db.orderDao().updateOrderStatus(orderId, statusEnum)
     }
 }

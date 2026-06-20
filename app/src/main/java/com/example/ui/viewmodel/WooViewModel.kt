@@ -375,7 +375,20 @@ class WooViewModel(application: Application) : AndroidViewModel(application) {
 
     // --- ORDER OPERATIONS ---
     fun updateOrderStatus(orderId: Long, status: OrderStatus) {
-        viewModelScope.launch { repository.changeOrderStatus(orderId, status) }
+        viewModelScope.launch(Dispatchers.IO) {
+            repository.changeOrderStatus(orderId, status)
+            // Push status to WooCommerce
+            val store = db.storeDao().getActiveStore() ?: return@launch
+            try {
+                WooCommerceSync.updateOrderStatusOnWC(
+                    db, store.url, store.consumerKey, store.consumerSecret,
+                    orderId, status.name, repository.storeAllowInsecure
+                )
+            } catch (e: Exception) {
+                Log.w("WooSync", "Order status push failed: ${e.message}")
+                _syncMessage.value = "وضعیت سفارش محلی به‌روز شد ولی ارسال به سایت ناموفق بود"
+            }
+        }
     }
 
     fun updateOrderShippingStatus(orderId: Long, shippingStatus: String) {
@@ -396,35 +409,102 @@ class WooViewModel(application: Application) : AndroidViewModel(application) {
 
     // --- PRODUCT OPERATIONS ---
     fun updateProductStock(productId: Long, qty: Int) {
-        viewModelScope.launch { repository.updateProductStock(productId, qty, qty > 0) }
+        viewModelScope.launch(Dispatchers.IO) {
+            repository.updateProductStock(productId, qty, qty > 0)
+            // Push stock change to WooCommerce if store is connected
+            val store = db.storeDao().getActiveStore() ?: return@launch
+            try {
+                val product = db.productDao().getProductById(productId) ?: return@launch
+                WooCommerceSync.updateProductOnWC(db, store.url, store.consumerKey, store.consumerSecret, product, repository.storeAllowInsecure)
+            } catch (e: Exception) {
+                Log.w("WooSync", "Stock push failed: ${e.message}")
+                _syncMessage.value = "تغییر موجودی محلی ذخیره شد ولی ارسال به سایت ناموفق بود"
+            }
+        }
     }
 
     fun updateProductPrice(productId: Long, regular: Long, sale: Long) {
-        viewModelScope.launch { repository.updateProductPrice(productId, regular, sale) }
+        viewModelScope.launch(Dispatchers.IO) {
+            repository.updateProductPrice(productId, regular, sale)
+            val store = db.storeDao().getActiveStore() ?: return@launch
+            try {
+                val product = db.productDao().getProductById(productId) ?: return@launch
+                WooCommerceSync.updateProductOnWC(db, store.url, store.consumerKey, store.consumerSecret, product, repository.storeAllowInsecure)
+            } catch (e: Exception) {
+                Log.w("WooSync", "Price push failed: ${e.message}")
+                _syncMessage.value = "تغییر قیمت محلی ذخیره شد ولی ارسال به سایت ناموفق بود"
+            }
+        }
     }
 
     fun deleteProduct(productId: Long, name: String) {
-        viewModelScope.launch { repository.deleteProduct(productId, name) }
+        viewModelScope.launch(Dispatchers.IO) {
+            val store = db.storeDao().getActiveStore()
+            if (store != null) {
+                try {
+                    WooCommerceSync.deleteProductOnWC(db, store.url, store.consumerKey, store.consumerSecret, productId, repository.storeAllowInsecure)
+                } catch (e: Exception) {
+                    Log.w("WooSync", "Delete push failed: ${e.message}")
+                    // Still delete locally even if WC delete fails
+                    repository.deleteProduct(productId, name)
+                    _syncMessage.value = "محصول محلی حذف شد ولی حذف از سایت ناموفق بود"
+                    return@launch
+                }
+            } else {
+                repository.deleteProduct(productId, name)
+            }
+        }
     }
 
     fun addProduct(product: WooProduct) {
-        viewModelScope.launch { repository.createProduct(product) }
+        viewModelScope.launch(Dispatchers.IO) {
+            val store = db.storeDao().getActiveStore()
+            if (store != null) {
+                try {
+                    WooCommerceSync.createProductOnWC(db, store.url, store.consumerKey, store.consumerSecret, product, repository.storeAllowInsecure)
+                } catch (e: Exception) {
+                    Log.w("WooSync", "Create product on WC failed: ${e.message}")
+                    // Save locally as fallback so user doesn't lose their work
+                    repository.createProduct(product)
+                    _syncMessage.value = "محصول محلی ذخیره شد ولی انتشار در سایت ناموفق بود: ${e.localizedMessage}"
+                }
+            } else {
+                repository.createProduct(product)
+            }
+        }
     }
 
     fun editProduct(product: WooProduct) {
-        viewModelScope.launch { repository.updateProduct(product) }
+        viewModelScope.launch(Dispatchers.IO) {
+            val store = db.storeDao().getActiveStore()
+            if (store != null) {
+                try {
+                    // If ID is a large local timestamp (not a real WC ID), create instead of update
+                    if (product.id > 1_000_000_000_000L) {
+                        WooCommerceSync.createProductOnWC(db, store.url, store.consumerKey, store.consumerSecret, product, repository.storeAllowInsecure)
+                    } else {
+                        WooCommerceSync.updateProductOnWC(db, store.url, store.consumerKey, store.consumerSecret, product, repository.storeAllowInsecure)
+                    }
+                } catch (e: Exception) {
+                    Log.w("WooSync", "Update product on WC failed: ${e.message}")
+                    repository.updateProduct(product)
+                    _syncMessage.value = "تغییرات محلی ذخیره شد ولی به‌روزرسانی در سایت ناموفق بود: ${e.localizedMessage}"
+                }
+            } else {
+                repository.updateProduct(product)
+            }
+        }
     }
 
     fun cloneProduct(product: WooProduct) {
         viewModelScope.launch(Dispatchers.IO) {
-            val timestamp = System.currentTimeMillis()
             val cloned = product.copy(
-                id = -(timestamp % 1_000_000_000L),
+                id = System.currentTimeMillis(),
                 name = "کپی از ${product.name}",
                 sku = if (product.sku.isNotBlank()) "COPY-${product.sku.take(18)}" else "",
                 status = "draft"
             )
-            repository.createProduct(cloned)
+            addProduct(cloned)
         }
     }
 

@@ -206,6 +206,9 @@ interface CategoryDao {
     @Query("SELECT * FROM woo_categories ORDER BY name ASC")
     fun getAllCategories(): Flow<List<WooCategory>>
 
+    @Query("SELECT * FROM woo_categories ORDER BY name ASC")
+    suspend fun getAllCategoriesList(): List<WooCategory>
+
     @Query("SELECT * FROM woo_categories WHERE name LIKE '%' || :query || '%' ORDER BY count DESC LIMIT 10")
     suspend fun searchCategories(query: String): List<WooCategory>
 
