@@ -42,6 +42,18 @@ data class OrderItem(
     val image: String = ""
 )
 
+// --- PRODUCT VARIANT (per-variant price/stock/sku for variable products) ---
+@JsonClass(generateAdapter = true)
+data class ProductVariant(
+    val variantId: Long = 0,
+    val combo: String = "",          // e.g. "قرمز" or "قرمز | XL"
+    val sku: String = "",
+    val regularPrice: Long = 0,
+    val salePrice: Long = 0,
+    val stockQty: Int = 0,
+    val image: String = ""
+)
+
 @Entity(tableName = "woo_orders")
 data class WooOrder(
     @PrimaryKey val id: Long,
@@ -103,6 +115,9 @@ data class WooProduct(
     val status: String = "publish", // publish, draft
     val colors: List<String> = emptyList(),
     val sizes: List<String> = emptyList(),
+    val colorAttributeName: String = "رنگ",
+    val sizeAttributeName: String = "سایز",
+    val variants: List<ProductVariant> = emptyList(),
     val warehouseNote: String = "",
     // Advanced fields
     val purchaseNote: String = "",
@@ -201,6 +216,16 @@ data class AdminUser(
     val permissions: List<String> = emptyList() // sub-attributes
 )
 
+// --- STORE PRODUCT CATEGORIES (cached from WooCommerce) ---
+@Entity(tableName = "woo_categories")
+data class WooCategory(
+    @PrimaryKey val id: Long,
+    val name: String,
+    val slug: String = "",
+    val parentId: Long = 0,
+    val count: Int = 0
+)
+
 // --- ACTIVITY LOGS ---
 @Entity(tableName = "admin_activities")
 data class AdminActivity(
@@ -243,6 +268,21 @@ class RoomTypeConverters {
     fun toStringList(value: String): List<String> {
         val type = Types.newParameterizedType(List::class.java, String::class.java)
         val adapter = moshi.adapter<List<String>>(type)
+        return adapter.fromJson(value) ?: emptyList()
+    }
+
+    @TypeConverter
+    fun fromVariantList(value: List<ProductVariant>?): String {
+        if (value == null) return "[]"
+        val type = Types.newParameterizedType(List::class.java, ProductVariant::class.java)
+        val adapter = moshi.adapter<List<ProductVariant>>(type)
+        return adapter.toJson(value)
+    }
+
+    @TypeConverter
+    fun toVariantList(value: String): List<ProductVariant> {
+        val type = Types.newParameterizedType(List::class.java, ProductVariant::class.java)
+        val adapter = moshi.adapter<List<ProductVariant>>(type)
         return adapter.fromJson(value) ?: emptyList()
     }
 }

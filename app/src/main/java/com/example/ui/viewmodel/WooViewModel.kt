@@ -47,6 +47,9 @@ class WooViewModel(application: Application) : AndroidViewModel(application) {
     val stores: StateFlow<List<WooStore>> = repository.getAllStores()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val categories: StateFlow<List<com.sahand.wooadmin.data.WooCategory>> = repository.getAllCategories()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     // --- SYNC STATES ---
     private val _isSyncing = MutableStateFlow(false)
     val isSyncing: StateFlow<Boolean> = _isSyncing.asStateFlow()

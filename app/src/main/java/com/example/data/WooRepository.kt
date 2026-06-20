@@ -108,6 +108,10 @@ class WooRepository(private val db: AppDatabase, private val context: Context) {
 
     fun getAllStores(): Flow<List<WooStore>> = db.storeDao().getAllStores()
 
+    fun getAllCategories(): Flow<List<WooCategory>> = db.categoryDao().getAllCategories()
+
+    suspend fun searchCategories(query: String): List<WooCategory> = db.categoryDao().searchCategories(query)
+
     // --- WRITE ACTIONS & TRANSACTIONS ---
     suspend fun changeOrderStatus(orderId: Long, status: OrderStatus) = withContext(Dispatchers.IO) {
         db.orderDao().updateOrderStatus(orderId, status.name)

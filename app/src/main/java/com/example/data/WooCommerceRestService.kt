@@ -12,6 +12,7 @@ import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
 import retrofit2.http.GET
+import retrofit2.http.Path
 import retrofit2.http.Query
 import java.util.concurrent.TimeUnit
 
@@ -22,6 +23,7 @@ data class WcProductDto(
     @Json(name = "id") val id: Long = 0,
     @Json(name = "name") val name: String = "",
     @Json(name = "slug") val slug: String = "",
+    @Json(name = "type") val type: String = "simple",
     @Json(name = "description") val description: String = "",
     @Json(name = "short_description") val shortDescription: String = "",
     @Json(name = "sku") val sku: String = "",
@@ -38,7 +40,40 @@ data class WcProductDto(
     @Json(name = "tags") val tags: List<WcTermDto> = emptyList(),
     @Json(name = "images") val images: List<WcImageDto> = emptyList(),
     @Json(name = "weight") val weight: String = "0",
-    @Json(name = "dimensions") val dimensions: WcDimensionsDto? = null
+    @Json(name = "dimensions") val dimensions: WcDimensionsDto? = null,
+    @Json(name = "attributes") val attributes: List<WcProductAttributeDto> = emptyList()
+)
+
+@JsonClass(generateAdapter = true)
+data class WcProductAttributeDto(
+    @Json(name = "name") val name: String = "",
+    @Json(name = "options") val options: List<String> = emptyList()
+)
+
+@JsonClass(generateAdapter = true)
+data class WcCategoryDto(
+    @Json(name = "id") val id: Long = 0,
+    @Json(name = "name") val name: String = "",
+    @Json(name = "slug") val slug: String = "",
+    @Json(name = "parent") val parent: Long = 0,
+    @Json(name = "count") val count: Int = 0
+)
+
+@JsonClass(generateAdapter = true)
+data class WcVariationDto(
+    @Json(name = "id") val id: Long = 0,
+    @Json(name = "sku") val sku: String = "",
+    @Json(name = "regular_price") val regularPrice: String = "0",
+    @Json(name = "sale_price") val salePrice: String = "0",
+    @Json(name = "stock_quantity") val stockQuantity: Int? = 0,
+    @Json(name = "attributes") val attributes: List<WcVariationAttrDto> = emptyList(),
+    @Json(name = "image") val image: WcImageDto? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class WcVariationAttrDto(
+    @Json(name = "name") val name: String = "",
+    @Json(name = "option") val option: String = ""
 )
 
 @JsonClass(generateAdapter = true)
@@ -132,6 +167,12 @@ interface WooCommerceRestApi {
     @GET("wp-json/wc/v3/products")
     suspend fun getProducts(@Query("per_page") perPage: Int = 100, @Query("page") page: Int = 1): List<WcProductDto>
 
+    @GET("wp-json/wc/v3/products/{id}/variations")
+    suspend fun getVariations(@Path("id") productId: Long, @Query("per_page") perPage: Int = 100): List<WcVariationDto>
+
+    @GET("wp-json/wc/v3/products/categories")
+    suspend fun getCategories(@Query("per_page") perPage: Int = 100, @Query("hide_empty") hideEmpty: Boolean = false): List<WcCategoryDto>
+
     @GET("wp-json/wc/v3/orders")
     suspend fun getOrders(@Query("per_page") perPage: Int = 100, @Query("page") page: Int = 1): List<WcOrderDto>
 
@@ -166,31 +207,58 @@ object WooCommerceSync {
             .create(WooCommerceRestApi::class.java)
     }
 
-    private fun mapProduct(dto: WcProductDto): WooProduct = WooProduct(
-        id = dto.id,
-        name = dto.name,
-        slug = dto.slug,
-        shortDescription = dto.shortDescription,
-        description = dto.description,
-        regularPrice = dto.regularPrice.toDoubleOrNull()?.toLong() ?: 0L,
-        salePrice = dto.salePrice.toDoubleOrNull()?.toLong() ?: 0L,
-        sku = dto.sku,
-        manageStock = dto.manageStock,
-        stockQuantity = dto.stockQuantity ?: 0,
-        inStock = dto.stockStatus == "instock",
-        status = dto.status,
-        isFeatured = dto.featured,
-        isVirtual = dto.virtual,
-        isDownloadable = dto.downloadable,
-        categories = dto.categories.joinToString(", ") { it.name },
-        tags = dto.tags.joinToString(", ") { it.name },
-        mainImage = dto.images.firstOrNull()?.src ?: "",
-        galleryImages = if (dto.images.size > 1) dto.images.drop(1).map { it.src } else emptyList(),
-        weight = dto.weight.toDoubleOrNull() ?: 0.0,
-        length = dto.dimensions?.length?.toDoubleOrNull() ?: 0.0,
-        width = dto.dimensions?.width?.toDoubleOrNull() ?: 0.0,
-        height = dto.dimensions?.height?.toDoubleOrNull() ?: 0.0
-    )
+    private fun mapProduct(dto: WcProductDto, variations: List<WcVariationDto> = emptyList()): WooProduct {
+        // Extract attribute colors and sizes from WC product attributes
+        val attrColors = dto.attributes.find { it.name == "رنگ" || it.name.contains("color", ignoreCase = true) }?.options ?: emptyList()
+        val attrSizes = dto.attributes.find { it.name == "سایز" || it.name.contains("size", ignoreCase = true) }?.options ?: emptyList()
+        val attr1Name = dto.attributes.find { it.name == "رنگ" || it.name.contains("color", ignoreCase = true) }?.name ?: "رنگ"
+        val attr2Name = dto.attributes.find { it.name == "سایز" || it.name.contains("size", ignoreCase = true) }?.name ?: "سایز"
+
+        // Map WC variations to ProductVariant
+        val mappedVariants = variations.map { v ->
+            val comboStr = v.attributes.joinToString(" | ") { it.option }
+            ProductVariant(
+                variantId = v.id,
+                combo = comboStr,
+                sku = v.sku,
+                regularPrice = v.regularPrice.toDoubleOrNull()?.toLong() ?: 0L,
+                salePrice = v.salePrice.toDoubleOrNull()?.toLong() ?: 0L,
+                stockQty = v.stockQuantity ?: 0,
+                image = v.image?.src ?: ""
+            )
+        }
+
+        return WooProduct(
+            id = dto.id,
+            name = dto.name,
+            slug = dto.slug,
+            shortDescription = dto.shortDescription,
+            description = dto.description,
+            regularPrice = dto.regularPrice.toDoubleOrNull()?.toLong() ?: 0L,
+            salePrice = dto.salePrice.toDoubleOrNull()?.toLong() ?: 0L,
+            sku = dto.sku,
+            manageStock = dto.manageStock,
+            stockQuantity = dto.stockQuantity ?: 0,
+            inStock = dto.stockStatus == "instock",
+            status = dto.status,
+            isFeatured = dto.featured,
+            isVirtual = dto.virtual,
+            isDownloadable = dto.downloadable,
+            categories = dto.categories.joinToString(", ") { it.name },
+            tags = dto.tags.joinToString(", ") { it.name },
+            mainImage = dto.images.firstOrNull()?.src ?: "",
+            galleryImages = if (dto.images.size > 1) dto.images.drop(1).map { it.src } else emptyList(),
+            weight = dto.weight.toDoubleOrNull() ?: 0.0,
+            length = dto.dimensions?.length?.toDoubleOrNull() ?: 0.0,
+            width = dto.dimensions?.width?.toDoubleOrNull() ?: 0.0,
+            height = dto.dimensions?.height?.toDoubleOrNull() ?: 0.0,
+            colors = attrColors,
+            sizes = attrSizes,
+            colorAttributeName = attr1Name,
+            sizeAttributeName = attr2Name,
+            variants = mappedVariants
+        )
+    }
 
     private fun mapOrder(dto: WcOrderDto): WooOrder {
         val status = when (dto.status.lowercase()) {
@@ -312,9 +380,25 @@ object WooCommerceSync {
         val api = buildApi(baseUrl, consumerKey, consumerSecret)
 
         try {
+            onProgress("دریافت دسته‌بندی‌ها از ووکامرس...")
+            val categories = api.getCategories()
+            val mappedCats = categories.map { WooCategory(id = it.id, name = it.name, slug = it.slug, parentId = it.parent, count = it.count) }
+            db.categoryDao().insertCategories(mappedCats)
+            onProgress("${categories.size} دسته‌بندی دریافت شد")
+        } catch (e: Exception) {
+            Log.w("WooSync", "Categories sync failed: ${e.message}")
+        }
+
+        try {
             onProgress("دریافت محصولات از ووکامرس...")
             val products = api.getProducts()
-            db.productDao().insertProducts(products.map { mapProduct(it) })
+            val mappedProducts = products.map { dto ->
+                val variations = if (dto.type == "variable") {
+                    try { api.getVariations(dto.id) } catch (e: Exception) { emptyList() }
+                } else emptyList()
+                mapProduct(dto, variations)
+            }
+            db.productDao().insertProducts(mappedProducts)
             onProgress("${products.size} محصول دریافت و ذخیره شد")
         } catch (e: Exception) {
             Log.w("WooSync", "Products sync failed: ${e.message}")

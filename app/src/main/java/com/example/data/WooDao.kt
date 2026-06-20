@@ -194,3 +194,18 @@ interface AdminActivityDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertActivity(activity: AdminActivity)
 }
+
+@Dao
+interface CategoryDao {
+    @Query("SELECT * FROM woo_categories ORDER BY name ASC")
+    fun getAllCategories(): Flow<List<WooCategory>>
+
+    @Query("SELECT * FROM woo_categories WHERE name LIKE '%' || :query || '%' ORDER BY count DESC LIMIT 10")
+    suspend fun searchCategories(query: String): List<WooCategory>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertCategories(categories: List<WooCategory>)
+
+    @Query("DELETE FROM woo_categories")
+    suspend fun clearAllCategories()
+}

@@ -15,9 +15,10 @@ import androidx.room.TypeConverters
         WooCoupon::class,
         WooNotification::class,
         AdminUser::class,
-        AdminActivity::class
+        AdminActivity::class,
+        WooCategory::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 @TypeConverters(RoomTypeConverters::class)
@@ -31,6 +32,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun notificationDao(): NotificationDao
     abstract fun adminUserDao(): AdminUserDao
     abstract fun adminActivityDao(): AdminActivityDao
+    abstract fun categoryDao(): CategoryDao
 
     companion object {
         @Volatile

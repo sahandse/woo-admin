@@ -1258,10 +1258,21 @@ fun AddEditProductScreen(
     var showGalleryUrlInput by remember { mutableStateOf(false) }
 
     // Variable attributes
+    var attr1Name by remember { mutableStateOf(product?.colorAttributeName ?: "رنگ") }
     var colorInput by remember { mutableStateOf("") }
     var colorList by remember { mutableStateOf<List<String>>(product?.colors ?: emptyList()) }
+    var attr2Name by remember { mutableStateOf(product?.sizeAttributeName ?: "سایز") }
     var sizeInput by remember { mutableStateOf("") }
     var sizeList by remember { mutableStateOf<List<String>>(product?.sizes ?: emptyList()) }
+
+    // Per-variant pricing/stock/sku
+    val initVariants = product?.variants ?: emptyList()
+    var variantPrices by remember { mutableStateOf(initVariants.associate { it.combo to it.regularPrice.toString() }) }
+    var variantSaleP by remember { mutableStateOf(initVariants.associate { it.combo to if (it.salePrice > 0) it.salePrice.toString() else "" }) }
+    var variantStocks by remember { mutableStateOf(initVariants.associate { it.combo to it.stockQty.toString() }) }
+    var variantSkus by remember { mutableStateOf(initVariants.associate { it.combo to it.sku }) }
+    var bulkVariantPrice by remember { mutableStateOf("") }
+    var bulkVariantStock by remember { mutableStateOf("") }
 
     // Sale schedule
     var isPromoActive by remember { mutableStateOf(product?.isPromoActive ?: false) }
@@ -1288,6 +1299,7 @@ fun AddEditProductScreen(
     var crossSellsInput by remember { mutableStateOf(product?.linkedCrossSells ?: "") }
 
     val context = LocalContext.current
+    val cachedCategories by viewModel.categories.collectAsState()
     val displayMainImage: Any? = mainImageUri ?: mainImageUrl.takeIf { it.isNotBlank() }
 
     val mainImagePickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
@@ -1364,6 +1376,26 @@ fun AddEditProductScreen(
                                 isFeatured = isFeatured,
                                 colors = colorList,
                                 sizes = sizeList,
+                                colorAttributeName = attr1Name,
+                                sizeAttributeName = attr2Name,
+                                variants = if (productType == 1) {
+                                    val combos = when {
+                                        colorList.isNotEmpty() && sizeList.isNotEmpty() ->
+                                            colorList.flatMap { c -> sizeList.map { s -> "$c | $s" } }
+                                        colorList.isNotEmpty() -> colorList
+                                        sizeList.isNotEmpty() -> sizeList
+                                        else -> emptyList()
+                                    }
+                                    combos.map { combo ->
+                                        com.sahand.wooadmin.data.ProductVariant(
+                                            combo = combo,
+                                            regularPrice = variantPrices[combo]?.toLongOrNull() ?: (regularPrice.toLongOrNull() ?: 0),
+                                            salePrice = variantSaleP[combo]?.toLongOrNull() ?: 0,
+                                            stockQty = variantStocks[combo]?.toIntOrNull() ?: 0,
+                                            sku = variantSkus[combo] ?: ""
+                                        )
+                                    }
+                                } else emptyList(),
                                 warehouseNote = warehouseNote,
                                 externalUrl = if (productType == 2) externalUrl else "",
                                 buttonText = if (productType == 2) buttonText else "",
@@ -1674,6 +1706,41 @@ fun AddEditProductScreen(
                                 .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(10.dp))
                         ) {
                             Icon(Icons.Default.Add, null, tint = Color.White)
+                        }
+                    }
+                    // Autocomplete suggestions from WooCommerce categories
+                    val catSuggestions = remember(categoryInput, cachedCategories) {
+                        if (categoryInput.length < 1) emptyList()
+                        else cachedCategories.filter {
+                            it.name.contains(categoryInput, ignoreCase = true) && !categoryList.contains(it.name)
+                        }.take(6)
+                    }
+                    AnimatedVisibility(visible = catSuggestions.isNotEmpty()) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(0.dp, 0.dp, 10.dp, 10.dp))
+                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                        ) {
+                            catSuggestions.forEachIndexed { idx, cat ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            categoryList = categoryList + cat.name
+                                            categoryInput = ""
+                                        }
+                                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(cat.name, fontSize = 13.sp)
+                                    if (cat.count > 0) {
+                                        Text("${cat.count} محصول", fontSize = 11.sp, color = MaterialTheme.colorScheme.primary)
+                                    }
+                                }
+                                if (idx < catSuggestions.lastIndex) HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.15f))
+                            }
                         }
                     }
                     if (categoryList.isNotEmpty()) {
@@ -2034,23 +2101,30 @@ fun AddEditProductScreen(
                 // ── VARIABLE ATTRIBUTES ──
                 AnimatedVisibility(visible = productType == 1) {
                     Column {
-                        ProductSectionHeader("ویژگی‌ها و تنوع", Icons.Default.Tune)
+                        ProductSectionHeader("تعریف ویژگی‌ها", Icons.Default.Tune)
 
                         Column(
                             modifier = Modifier.padding(horizontal = 16.dp),
                             verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            // Colors attribute
-                            Text("رنگ‌ها", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                            // Attribute 1 (color-type)
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 OutlinedTextField(
+                                    value = attr1Name,
+                                    onValueChange = { attr1Name = it },
+                                    label = { Text("نام ویژگی ۱", fontSize = 11.sp) },
+                                    modifier = Modifier.width(110.dp),
+                                    shape = RoundedCornerShape(10.dp),
+                                    singleLine = true
+                                )
+                                OutlinedTextField(
                                     value = colorInput,
                                     onValueChange = { colorInput = it },
-                                    label = { Text("رنگ جدید (مثلاً: قرمز)") },
+                                    label = { Text("مقدار جدید $attr1Name") },
                                     modifier = Modifier.weight(1f),
                                     shape = RoundedCornerShape(10.dp),
                                     singleLine = true
@@ -2062,34 +2136,19 @@ fun AddEditProductScreen(
                                             colorList = colorList + v; colorInput = ""
                                         }
                                     },
-                                    modifier = Modifier
-                                        .size(48.dp)
-                                        .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(10.dp))
-                                ) {
-                                    Icon(Icons.Default.Add, null, tint = Color.White)
-                                }
+                                    modifier = Modifier.size(48.dp).background(MaterialTheme.colorScheme.primary, RoundedCornerShape(10.dp))
+                                ) { Icon(Icons.Default.Add, null, tint = Color.White) }
                             }
                             if (colorList.isNotEmpty()) {
                                 Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .horizontalScroll(rememberScrollState()),
+                                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
                                     colorList.forEach { c ->
                                         InputChip(
-                                            selected = false,
-                                            onClick = {},
+                                            selected = false, onClick = {},
                                             label = { Text(c, fontSize = 12.sp) },
-                                            trailingIcon = {
-                                                Icon(
-                                                    Icons.Default.Close,
-                                                    null,
-                                                    modifier = Modifier
-                                                        .size(14.dp)
-                                                        .clickable { colorList = colorList.filter { it != c } }
-                                                )
-                                            }
+                                            trailingIcon = { Icon(Icons.Default.Close, null, modifier = Modifier.size(14.dp).clickable { colorList = colorList.filter { it != c } }) }
                                         )
                                     }
                                 }
@@ -2097,17 +2156,24 @@ fun AddEditProductScreen(
 
                             HorizontalDivider()
 
-                            // Sizes attribute
-                            Text("سایزها", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                            // Attribute 2 (size-type) — optional
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 OutlinedTextField(
+                                    value = attr2Name,
+                                    onValueChange = { attr2Name = it },
+                                    label = { Text("نام ویژگی ۲", fontSize = 11.sp) },
+                                    modifier = Modifier.width(110.dp),
+                                    shape = RoundedCornerShape(10.dp),
+                                    singleLine = true
+                                )
+                                OutlinedTextField(
                                     value = sizeInput,
                                     onValueChange = { sizeInput = it },
-                                    label = { Text("سایز جدید (مثلاً: XL)") },
+                                    label = { Text("مقدار جدید $attr2Name (اختیاری)") },
                                     modifier = Modifier.weight(1f),
                                     shape = RoundedCornerShape(10.dp),
                                     singleLine = true
@@ -2119,64 +2185,92 @@ fun AddEditProductScreen(
                                             sizeList = sizeList + v; sizeInput = ""
                                         }
                                     },
-                                    modifier = Modifier
-                                        .size(48.dp)
-                                        .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(10.dp))
-                                ) {
-                                    Icon(Icons.Default.Add, null, tint = Color.White)
-                                }
+                                    modifier = Modifier.size(48.dp).background(MaterialTheme.colorScheme.primary, RoundedCornerShape(10.dp))
+                                ) { Icon(Icons.Default.Add, null, tint = Color.White) }
                             }
                             if (sizeList.isNotEmpty()) {
                                 Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .horizontalScroll(rememberScrollState()),
+                                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
                                     sizeList.forEach { s ->
                                         InputChip(
-                                            selected = false,
-                                            onClick = {},
+                                            selected = false, onClick = {},
                                             label = { Text(s, fontSize = 12.sp) },
-                                            trailingIcon = {
-                                                Icon(
-                                                    Icons.Default.Close,
-                                                    null,
-                                                    modifier = Modifier
-                                                        .size(14.dp)
-                                                        .clickable { sizeList = sizeList.filter { it != s } }
-                                                )
-                                            }
-                                        )
-                                    }
-                                }
-                            }
-
-                            if (colorList.isNotEmpty() || sizeList.isNotEmpty()) {
-                                val combinations = when {
-                                    colorList.isNotEmpty() && sizeList.isNotEmpty() -> colorList.size * sizeList.size
-                                    else -> colorList.size + sizeList.size
-                                }
-                                Card(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)),
-                                    shape = RoundedCornerShape(10.dp)
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(12.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Icon(Icons.Default.Info, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
-                                        Spacer(Modifier.width(8.dp))
-                                        Text(
-                                            "$combinations ترکیب (variant) ایجاد خواهد شد",
-                                            fontSize = 12.sp,
-                                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                                            trailingIcon = { Icon(Icons.Default.Close, null, modifier = Modifier.size(14.dp).clickable { sizeList = sizeList.filter { it != s } }) }
                                         )
                                     }
                                 }
                             }
                         }
+                    }
+                }
+
+                // ── VARIANT MATRIX (price/stock per variant) ──
+                val combos = if (productType == 1) {
+                    when {
+                        colorList.isNotEmpty() && sizeList.isNotEmpty() ->
+                            colorList.flatMap { c -> sizeList.map { s -> "$c | $s" } }
+                        colorList.isNotEmpty() -> colorList
+                        sizeList.isNotEmpty() -> sizeList
+                        else -> emptyList()
+                    }
+                } else emptyList()
+
+                AnimatedVisibility(visible = combos.isNotEmpty()) {
+                    Column {
+                        ProductSectionHeader("جدول تنوع‌ها (${combos.size} ترکیب)", Icons.Default.TableRows)
+
+                        // Bulk fill row
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            OutlinedTextField(
+                                value = bulkVariantPrice,
+                                onValueChange = { bulkVariantPrice = it.filter { c -> c.isDigit() } },
+                                label = { Text("قیمت یکسان همه", fontSize = 11.sp) },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(10.dp),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                singleLine = true
+                            )
+                            OutlinedTextField(
+                                value = bulkVariantStock,
+                                onValueChange = { bulkVariantStock = it.filter { c -> c.isDigit() } },
+                                label = { Text("موجودی یکسان", fontSize = 11.sp) },
+                                modifier = Modifier.weight(0.8f),
+                                shape = RoundedCornerShape(10.dp),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                singleLine = true
+                            )
+                            IconButton(
+                                onClick = {
+                                    if (bulkVariantPrice.isNotBlank()) variantPrices = combos.associate { it to bulkVariantPrice }
+                                    if (bulkVariantStock.isNotBlank()) variantStocks = combos.associate { it to bulkVariantStock }
+                                },
+                                modifier = Modifier.size(52.dp).background(MaterialTheme.colorScheme.primary, RoundedCornerShape(10.dp))
+                            ) { Icon(Icons.Default.DoneAll, null, tint = Color.White, modifier = Modifier.size(22.dp)) }
+                        }
+
+                        Spacer(Modifier.height(4.dp))
+
+                        // Per-variant rows
+                        combos.forEach { combo ->
+                            VariantRow(
+                                combo = combo,
+                                price = variantPrices[combo] ?: "",
+                                salePrice = variantSaleP[combo] ?: "",
+                                stock = variantStocks[combo] ?: "0",
+                                sku = variantSkus[combo] ?: "",
+                                onPriceChange = { variantPrices = variantPrices + (combo to it) },
+                                onSalePriceChange = { variantSaleP = variantSaleP + (combo to it) },
+                                onStockChange = { variantStocks = variantStocks + (combo to it) },
+                                onSkuChange = { variantSkus = variantSkus + (combo to it) }
+                            )
+                        }
+                        Spacer(Modifier.height(4.dp))
                     }
                 }
 
@@ -2296,6 +2390,92 @@ fun AddEditProductScreen(
                 }
 
                 Spacer(Modifier.height(24.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun VariantRow(
+    combo: String,
+    price: String,
+    salePrice: String,
+    stock: String,
+    sku: String,
+    onPriceChange: (String) -> Unit,
+    onSalePriceChange: (String) -> Unit,
+    onStockChange: (String) -> Unit,
+    onSkuChange: (String) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 3.dp),
+        shape = RoundedCornerShape(10.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
+    ) {
+        Column(modifier = Modifier.padding(10.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    combo,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.width(90.dp),
+                    maxLines = 2
+                )
+                OutlinedTextField(
+                    value = price,
+                    onValueChange = { onPriceChange(it.filter { c -> c.isDigit() }) },
+                    label = { Text("قیمت", fontSize = 10.sp) },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    shape = RoundedCornerShape(8.dp)
+                )
+                OutlinedTextField(
+                    value = stock,
+                    onValueChange = { onStockChange(it.filter { c -> c.isDigit() }) },
+                    label = { Text("موجودی", fontSize = 10.sp) },
+                    modifier = Modifier.weight(0.75f),
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    shape = RoundedCornerShape(8.dp)
+                )
+                IconButton(onClick = { expanded = !expanded }, modifier = Modifier.size(32.dp)) {
+                    Icon(
+                        if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        null, modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+            AnimatedVisibility(visible = expanded) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedTextField(
+                        value = salePrice,
+                        onValueChange = { onSalePriceChange(it.filter { c -> c.isDigit() }) },
+                        label = { Text("قیمت حراجی", fontSize = 10.sp) },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        shape = RoundedCornerShape(8.dp)
+                    )
+                    OutlinedTextField(
+                        value = sku,
+                        onValueChange = onSkuChange,
+                        label = { Text("SKU", fontSize = 10.sp) },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true,
+                        shape = RoundedCornerShape(8.dp)
+                    )
+                }
             }
         }
     }
