@@ -84,7 +84,6 @@ fun MainAppContainer(
                             activeScreen is Screen.Orders ||
                             activeScreen is Screen.Products ||
                             activeScreen is Screen.Customers ||
-                            activeScreen is Screen.Settings ||
                             activeScreen is Screen.Tracking ||
                             activeScreen is Screen.AiAnalyst
 
@@ -394,6 +393,7 @@ fun MainAppContainer(
                     is Screen.Settings -> {
                         SettingsScreen(
                             viewModel = viewModel,
+                            onBack = { activeScreen = Screen.Dashboard },
                             onNavigateToActivities = { activeScreen = Screen.Activities },
                             onNavigateToCoupons = { activeScreen = Screen.Coupons },
                             onNavigateToReports = { activeScreen = Screen.Reports },

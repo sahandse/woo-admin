@@ -32,6 +32,7 @@ import com.sahand.wooadmin.ui.viewmodel.WooViewModel
 @Composable
 fun SettingsScreen(
     viewModel: WooViewModel,
+    onBack: () -> Unit = {},
     onNavigateToActivities: () -> Unit,
     onNavigateToCoupons: () -> Unit,
     onNavigateToReports: () -> Unit = {},
@@ -62,9 +63,28 @@ fun SettingsScreen(
     val context = LocalContext.current
 
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text("تنظیمات", fontWeight = FontWeight.Bold) },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "برگشت"
+                            )
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.surface
+                    )
+                )
+            }
+        ) { scaffoldPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .padding(scaffoldPadding)
                 .background(MaterialTheme.colorScheme.background)
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -445,6 +465,7 @@ fun SettingsScreen(
                 }
             )
         }
+        } // end Scaffold content
     }
 }
 

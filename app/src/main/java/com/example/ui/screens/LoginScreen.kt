@@ -2,18 +2,12 @@ package com.sahand.wooadmin.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -21,11 +15,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -39,35 +31,19 @@ fun LoginScreen(
     viewModel: WooViewModel,
     onLoginSuccess: () -> Unit
 ) {
-    var activeTab by remember { mutableStateOf(0) } // 0 = دمو, 1 = اتصال مستقیم ووکامرس
-
-    var username by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var showPassword by remember { mutableStateOf(false) }
-
-    // API connection fields
-    var storeName by remember { mutableStateOf("") }
-    var storeUrl by remember { mutableStateOf("") }
+    var storeName   by remember { mutableStateOf("") }
+    var storeUrl    by remember { mutableStateOf("") }
     var consumerKey by remember { mutableStateOf("") }
     var consumerSecret by remember { mutableStateOf("") }
     var isHttpsOnly by remember { mutableStateOf(true) }
 
-    // Connection process status
-    var isConnecting by remember { mutableStateOf(false) }
+    var isConnecting     by remember { mutableStateOf(false) }
     var connectionMessage by remember { mutableStateOf("") }
-    var apiError by remember { mutableStateOf<String?>(null) }
+    var apiError         by remember { mutableStateOf<String?>(null) }
 
-    val loginError by viewModel.loginError.collectAsState()
     val isLoggedIn by viewModel.isLoggedIn.collectAsState()
+    LaunchedEffect(isLoggedIn) { if (isLoggedIn) onLoginSuccess() }
 
-    // Redirect when login succeeds
-    LaunchedEffect(isLoggedIn) {
-        if (isLoggedIn) {
-            onLoginSuccess()
-        }
-    }
-
-    // Force RTL local layout direction for Persian user interfaces
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
         Box(
             modifier = Modifier
@@ -75,402 +51,226 @@ fun LoginScreen(
                 .background(MaterialTheme.colorScheme.background),
             contentAlignment = Alignment.Center
         ) {
-            // Main Card container
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(24.dp)
-                    .verticalScroll(rememberScrollState())
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(MaterialTheme.colorScheme.surface)
-                    .padding(24.dp),
+                    .verticalScroll(rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Brand Accent logo
+                Spacer(Modifier.height(32.dp))
+
+                // Logo
                 Box(
                     modifier = Modifier
-                        .size(64.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
+                        .size(72.dp)
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(MaterialTheme.colorScheme.primary),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = if (activeTab == 0) Icons.Default.Lock else Icons.Default.Lock,
-                        contentDescription = "قفل",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(32.dp)
+                        imageVector = Icons.Default.Storefront,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(38.dp)
                     )
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(Modifier.height(20.dp))
 
                 Text(
-                    text = if (activeTab == 0) "ورود به پنل مدیریت فروشگاه" else "اتصال امن به پنل ووکامرس",
-                    fontSize = 20.sp,
+                    "اتصال به فروشگاه",
+                    fontSize = 22.sp,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    textAlign = TextAlign.Center
+                    color = MaterialTheme.colorScheme.onBackground
                 )
-
                 Text(
-                    text = if (activeTab == 0) "سامانه یکپارچه کنترل وضعیت ووکامرس" else "تنظیم مشخصات و کلیدهای ارتباطی API",
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(top = 4.dp)
+                    "اطلاعات ووکامرس خود را وارد کنید",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 6.dp, bottom = 28.dp)
                 )
 
-                Spacer(modifier = Modifier.height(24.dp))
-
-                // Custom aesthetic segmented connection switcher tabs
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                        .padding(4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                // Card form
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(if (activeTab == 0) MaterialTheme.colorScheme.primary else Color.Transparent)
-                            .clickable(enabled = !isConnecting) { activeTab = 0 }
-                            .padding(vertical = 12.dp),
-                        contentAlignment = Alignment.Center
+                    Column(
+                        modifier = Modifier.padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
-                        Text(
-                            text = "ورود با اکانت دمو",
-                            color = if (activeTab == 0) Color.White else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp
-                        )
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(if (activeTab == 1) MaterialTheme.colorScheme.primary else Color.Transparent)
-                            .clickable(enabled = !isConnecting) { activeTab = 1 }
-                            .padding(vertical = 12.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "اتصال به وب‌سایت (API)",
-                            color = if (activeTab == 1) Color.White else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                if (activeTab == 0) {
-                    // --- TAB I: SANDBOX DEMO LOGIN ---
-                    
-                    // Error message
-                    AnimatedVisibility(visible = loginError != null) {
-                        Card(
-                            colors = CardDefaults.cardColors(containerColor = RedError.copy(alpha = 0.1f)),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = 16.dp)
-                        ) {
-                            Text(
-                                text = loginError ?: "",
-                                color = RedError,
-                                fontSize = 12.sp,
-                                modifier = Modifier.padding(12.dp),
-                                textAlign = TextAlign.Right
-                            )
-                        }
-                    }
-
-                    // Username field
-                    OutlinedTextField(
-                        value = username,
-                        onValueChange = { username = it },
-                        label = { Text("نام کاربری") },
-                        leadingIcon = {
-                            Icon(imageVector = Icons.Default.Person, contentDescription = null)
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("username_input"),
-                        shape = RoundedCornerShape(12.dp),
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = MaterialTheme.colorScheme.primary,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outline
-                        )
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Password field
-                    OutlinedTextField(
-                        value = password,
-                        onValueChange = { password = it },
-                        label = { Text("رمز عبور") },
-                        leadingIcon = {
-                            Icon(imageVector = Icons.Default.Lock, contentDescription = null)
-                        },
-                        trailingIcon = {
-                            IconButton(onClick = { showPassword = !showPassword }) {
-                                Icon(
-                                    imageVector = if (showPassword) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                                    contentDescription = "نمایش رمز"
-                                )
-                            }
-                        },
-                        visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("password_input"),
-                        shape = RoundedCornerShape(12.dp),
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = MaterialTheme.colorScheme.primary,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outline
-                        )
-                    )
-
-                    Spacer(modifier = Modifier.height(24.dp))
-
-                    // Login click button
-                    Button(
-                        onClick = { viewModel.performLogin(username, password) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(52.dp)
-                            .testTag("login_button"),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-                    ) {
-                        Text(
-                            text = "ورود به حساب کاربری",
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                    }
-
-                } else {
-                    // --- TAB II: REAL WOOCOMMERCE CONNECTION RECEIVER ---
-
-                    // Connecting progress visual indicator
-                    if (isConnecting) {
-                        Card(
-                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.05f)),
-                            shape = RoundedCornerShape(16.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = 20.dp)
-                        ) {
-                            Column(
+                        // Progress
+                        AnimatedVisibility(visible = isConnecting) {
+                            Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(20.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(MaterialTheme.colorScheme.primaryContainer)
+                                    .padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
                                 CircularProgressIndicator(
-                                    modifier = Modifier.size(36.dp),
-                                    color = MaterialTheme.colorScheme.primary,
-                                    strokeWidth = 3.dp
+                                    modifier = Modifier.size(18.dp),
+                                    strokeWidth = 2.dp,
+                                    color = MaterialTheme.colorScheme.primary
                                 )
-                                Spacer(modifier = Modifier.height(14.dp))
                                 Text(
-                                    text = connectionMessage,
-                                    fontWeight = FontWeight.Bold,
+                                    connectionMessage,
                                     fontSize = 13.sp,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    textAlign = TextAlign.Center
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
                                 )
                             }
                         }
-                    }
 
-                    // Input constraints or SSL exceptions
-                    AnimatedVisibility(visible = apiError != null) {
-                        Card(
-                            colors = CardDefaults.cardColors(containerColor = RedError.copy(alpha = 0.1f)),
+                        // Error
+                        AnimatedVisibility(visible = apiError != null) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(RedError.copy(alpha = 0.1f))
+                                    .padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(Icons.Default.ErrorOutline, null, tint = RedError, modifier = Modifier.size(18.dp))
+                                Text(apiError ?: "", color = RedError, fontSize = 12.sp)
+                            }
+                        }
+
+                        // نام فروشگاه
+                        OutlinedTextField(
+                            value = storeName,
+                            onValueChange = { storeName = it },
+                            label = { Text("نام فروشگاه") },
+                            placeholder = { Text("مثال: فروشگاه من") },
+                            leadingIcon = { Icon(Icons.Default.Store, null) },
+                            modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = 16.dp)
-                        ) {
-                            Text(
-                                text = apiError ?: "",
-                                color = RedError,
-                                fontSize = 12.sp,
-                                modifier = Modifier.padding(12.dp),
-                                textAlign = TextAlign.Right
-                            )
-                        }
-                    }
-
-                    // 1. Store Name Parameter
-                    OutlinedTextField(
-                        value = storeName,
-                        onValueChange = { storeName = it },
-                        label = { Text("نام فروشگاه (عنوان اتصال)") },
-                        leadingIcon = {
-                            Icon(imageVector = Icons.Default.Home, contentDescription = null)
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("api_store_name_input"),
-                        shape = RoundedCornerShape(12.dp),
-                        singleLine = true,
-                        enabled = !isConnecting,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = MaterialTheme.colorScheme.primary,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outline
-                        )
-                    )
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    // 2. Store URL
-                    OutlinedTextField(
-                        value = storeUrl,
-                        onValueChange = { storeUrl = it },
-                        label = { Text("آدرس سایت ووکامرس (URL)") },
-                        placeholder = { Text("https://my-shop.com") },
-                        leadingIcon = {
-                            Icon(imageVector = Icons.Default.Home, contentDescription = null)
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("api_store_url_input"),
-                        shape = RoundedCornerShape(12.dp),
-                        singleLine = true,
-                        enabled = !isConnecting,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = MaterialTheme.colorScheme.primary,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outline
-                        )
-                    )
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    // 3. Consumer Key (ck_...)
-                    OutlinedTextField(
-                        value = consumerKey,
-                        onValueChange = { consumerKey = it },
-                        label = { Text("کلید مصرف‌کننده (Consumer Key)") },
-                        placeholder = { Text("ck_...") },
-                        leadingIcon = {
-                            Icon(imageVector = Icons.Default.Person, contentDescription = null)
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("api_consumer_key_input"),
-                        shape = RoundedCornerShape(12.dp),
-                        singleLine = true,
-                        enabled = !isConnecting,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = MaterialTheme.colorScheme.primary,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outline
-                        )
-                    )
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    // 4. Consumer Secret (cs_...)
-                    OutlinedTextField(
-                        value = consumerSecret,
-                        onValueChange = { consumerSecret = it },
-                        label = { Text("رمز مصرف‌کننده (Consumer Secret)") },
-                        placeholder = { Text("cs_...") },
-                        leadingIcon = {
-                            Icon(imageVector = Icons.Default.Lock, contentDescription = null)
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .testTag("api_consumer_secret_input"),
-                        shape = RoundedCornerShape(12.dp),
-                        singleLine = true,
-                        enabled = !isConnecting,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = MaterialTheme.colorScheme.primary,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.outline
-                        )
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // 5. SSL / HTTPS Validation Option switch
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f))
-                            .padding(12.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("الزام اتصال امن رمزگذاری‌شده (HTTPS)", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                            Text("جهت محافظت رمزگذاری‌شده کلیدهای API و سفارشات با SSL", fontSize = 10.sp, color = Color.Gray)
-                        }
-                        Switch(
-                            checked = isHttpsOnly,
-                            onCheckedChange = { isHttpsOnly = it },
+                            singleLine = true,
                             enabled = !isConnecting
                         )
-                    }
 
-                    Spacer(modifier = Modifier.height(24.dp))
+                        // آدرس سایت
+                        OutlinedTextField(
+                            value = storeUrl,
+                            onValueChange = { storeUrl = it },
+                            label = { Text("آدرس سایت") },
+                            placeholder = { Text("https://my-shop.com") },
+                            leadingIcon = { Icon(Icons.Default.Language, null) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            singleLine = true,
+                            enabled = !isConnecting
+                        )
 
-                    // 6. Action Submission Button
-                    Button(
-                        onClick = {
-                            isConnecting = true
-                            apiError = null
-                            viewModel.connectWooCommerceSecurely(
-                                storeName = storeName,
-                                storeUrl = storeUrl,
-                                consumerKey = consumerKey,
-                                consumerSecret = consumerSecret,
-                                isHttpsOnly = isHttpsOnly,
-                                onProgressUpdate = { msg ->
-                                    connectionMessage = msg
-                                },
-                                onSuccess = {
-                                    isConnecting = false
-                                },
-                                onError = { error ->
-                                    isConnecting = false
-                                    apiError = error
-                                }
+                        // Consumer Key
+                        OutlinedTextField(
+                            value = consumerKey,
+                            onValueChange = { consumerKey = it },
+                            label = { Text("Consumer Key") },
+                            placeholder = { Text("ck_...") },
+                            leadingIcon = { Icon(Icons.Default.VpnKey, null) },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            singleLine = true,
+                            enabled = !isConnecting
+                        )
+
+                        // Consumer Secret
+                        OutlinedTextField(
+                            value = consumerSecret,
+                            onValueChange = { consumerSecret = it },
+                            label = { Text("Consumer Secret") },
+                            placeholder = { Text("cs_...") },
+                            leadingIcon = { Icon(Icons.Default.Lock, null) },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            singleLine = true,
+                            enabled = !isConnecting
+                        )
+
+                        // HTTPS toggle
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column {
+                                Text("اتصال امن HTTPS", fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                                Text("برای سایت‌های بدون SSL خاموش کنید", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Switch(
+                                checked = isHttpsOnly,
+                                onCheckedChange = { isHttpsOnly = it },
+                                enabled = !isConnecting
                             )
-                        },
-                        enabled = !isConnecting,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(52.dp)
-                            .testTag("api_connect_button"),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(imageVector = Icons.Default.Lock, contentDescription = null)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                "اتصال امن به ووکامرس و ورود",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Color.White
-                            )
+                        }
+
+                        // دکمه اتصال
+                        Button(
+                            onClick = {
+                                isConnecting = true
+                                apiError = null
+                                viewModel.connectWooCommerceSecurely(
+                                    storeName = storeName,
+                                    storeUrl = storeUrl,
+                                    consumerKey = consumerKey,
+                                    consumerSecret = consumerSecret,
+                                    isHttpsOnly = isHttpsOnly,
+                                    onProgressUpdate = { msg -> connectionMessage = msg },
+                                    onSuccess = { isConnecting = false },
+                                    onError = { err -> isConnecting = false; apiError = err }
+                                )
+                            },
+                            enabled = !isConnecting,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(52.dp),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                        ) {
+                            if (isConnecting) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp),
+                                    strokeWidth = 2.dp,
+                                    color = Color.White
+                                )
+                            } else {
+                                Icon(Icons.Default.Link, null, modifier = Modifier.size(20.dp), tint = Color.White)
+                                Spacer(Modifier.width(8.dp))
+                                Text("اتصال و ورود", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                            }
                         }
                     }
                 }
+
+                Spacer(Modifier.height(16.dp))
+
+                // راهنما
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+                    elevation = CardDefaults.cardElevation(0.dp)
+                ) {
+                    Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("چطور کلیدها را بگیرم؟", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                        Text(
+                            "در پنل ووردپرس: ووکامرس ← تنظیمات ← پیشرفته ← REST API ← افزودن کلید",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            lineHeight = 18.sp
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(32.dp))
             }
         }
     }
