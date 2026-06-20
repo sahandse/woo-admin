@@ -54,6 +54,7 @@ fun ProductsScreen(
     val searchInput by viewModel.productSearchQuery.collectAsState()
     val filterType by viewModel.productFilter.collectAsState()
     val activeCategory by viewModel.productCategoryFilter.collectAsState()
+    val isSyncing by viewModel.isSyncing.collectAsState()
 
     var showFilters by remember { mutableStateOf(false) }
 
@@ -124,10 +125,10 @@ fun ProductsScreen(
                         }
                     },
                     modifier = Modifier
-                        .size(52.dp)
-                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f), RoundedCornerShape(12.dp))
+                        .size(44.dp)
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f), RoundedCornerShape(10.dp))
                 ) {
-                    Icon(imageVector = Icons.Default.QrCodeScanner, contentDescription = "اسکن بارکد", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Icon(imageVector = Icons.Default.QrCodeScanner, contentDescription = "اسکن بارکد", tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
                 }
 
                 // Bulk price mode toggle
@@ -137,16 +138,17 @@ fun ProductsScreen(
                         if (!bulkPriceMode) selectedProducts = emptySet()
                     },
                     modifier = Modifier
-                        .size(52.dp)
+                        .size(44.dp)
                         .background(
                             if (bulkPriceMode) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-                            RoundedCornerShape(12.dp)
+                            RoundedCornerShape(10.dp)
                         )
                 ) {
                     Icon(
                         imageVector = if (bulkPriceMode) Icons.Default.PriceChange else Icons.Default.Percent,
                         contentDescription = "مدیریت انبوه قیمت",
-                        tint = if (bulkPriceMode) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                        tint = if (bulkPriceMode) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
                     )
                 }
 
@@ -154,51 +156,32 @@ fun ProductsScreen(
                 IconButton(
                     onClick = { showFilters = !showFilters },
                     modifier = Modifier
-                        .size(52.dp)
+                        .size(44.dp)
                         .background(
-                            if (showFilters || activeCategory != "ALL" || filterType != "ALL") 
-                                MaterialTheme.colorScheme.primaryContainer 
-                            else 
+                            if (showFilters || activeCategory != "ALL" || filterType != "ALL")
+                                MaterialTheme.colorScheme.primaryContainer
+                            else
                                 MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                            RoundedCornerShape(12.dp)
+                            RoundedCornerShape(10.dp)
                         )
                         .border(
                             width = 1.dp,
-                            color = if (showFilters || activeCategory != "ALL" || filterType != "ALL") 
-                                MaterialTheme.colorScheme.primary 
-                            else 
+                            color = if (showFilters || activeCategory != "ALL" || filterType != "ALL")
+                                MaterialTheme.colorScheme.primary
+                            else
                                 Color.Transparent,
-                            shape = RoundedCornerShape(12.dp)
+                            shape = RoundedCornerShape(10.dp)
                         )
                 ) {
                     Icon(
                         imageVector = Icons.Default.FilterList,
                         contentDescription = "فیلتر پیشرفته",
-                        tint = if (showFilters || activeCategory != "ALL" || filterType != "ALL") 
-                            MaterialTheme.colorScheme.primary 
-                        else 
-                            MaterialTheme.colorScheme.onSurfaceVariant
+                        tint = if (showFilters || activeCategory != "ALL" || filterType != "ALL")
+                            MaterialTheme.colorScheme.primary
+                        else
+                            MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
                     )
-                }
-
-                // Inventory management shortcut
-                IconButton(
-                    onClick = onNavigateToInventory,
-                    modifier = Modifier
-                        .size(52.dp)
-                        .background(MaterialTheme.colorScheme.secondary, RoundedCornerShape(12.dp))
-                ) {
-                    Icon(imageVector = Icons.Default.Inventory2, contentDescription = "مدیریت انبار", tint = Color.White)
-                }
-
-                // Add FAB shortcut
-                IconButton(
-                    onClick = onNavigateToAdd,
-                    modifier = Modifier
-                        .size(52.dp)
-                        .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp))
-                ) {
-                    Icon(imageVector = Icons.Default.Add, contentDescription = "کالای جدید", tint = Color.White)
                 }
             }
 
@@ -450,54 +433,84 @@ fun ProductsScreen(
             Spacer(modifier = Modifier.height(12.dp))
 
             // Products Catalog
-            if (productsList.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .weight(1f),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(
-                            imageVector = Icons.Default.ProductionQuantityLimits,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f),
-                            modifier = Modifier.size(72.dp)
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text("کالایی یافت نشد!", fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
+            when {
+                isSyncing && productsList.isEmpty() -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .weight(1f),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            CircularProgressIndicator(modifier = Modifier.size(48.dp))
+                            Text("در حال بارگذاری محصولات...", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                        }
                     }
                 }
-            } else {
-                LazyColumn(
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(horizontal = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    items(productsList, key = { it.id }) { product ->
-                        ProductItemCard(
-                            product = product,
-                            onEdit = { onNavigateToEdit(product.id) },
-                            onPriceChange = {
-                                showQuickPriceDialog = product
-                                regularPriceInput = product.regularPrice.toString()
-                                salePriceInput = product.salePrice.toString()
-                            },
-                            onStockChange = {
-                                showQuickStockDialog = product
-                                stockInput = product.stockQuantity.toString()
-                            },
-                            onClone = { viewModel.cloneProduct(product); Toast.makeText(context, "پیش‌نویس کپی ایجاد شد", Toast.LENGTH_SHORT).show() },
-                            onIncrementStock = { viewModel.updateProductStock(product.id, product.stockQuantity + 1) },
-                            onDecrementStock = { viewModel.updateProductStock(product.id, (product.stockQuantity - 1).coerceAtLeast(0)) },
-                            isSelected = product.id in selectedProducts,
-                            showCheckbox = bulkPriceMode,
-                            onToggleSelect = {
-                                selectedProducts = if (product.id in selectedProducts)
-                                    selectedProducts - product.id else selectedProducts + product.id
+                productsList.isEmpty() -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .weight(1f),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Icon(
+                                imageVector = Icons.Default.ProductionQuantityLimits,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f),
+                                modifier = Modifier.size(72.dp)
+                            )
+                            Text(
+                                if (searchInput.isNotBlank() || filterType != "ALL" || activeCategory != "ALL")
+                                    "کالایی با این فیلتر یافت نشد"
+                                else
+                                    "هیچ محصولی وجود ندارد",
+                                fontSize = 14.sp,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                            )
+                            if (searchInput.isBlank() && filterType == "ALL" && activeCategory == "ALL") {
+                                Button(onClick = { viewModel.syncAllData() }) {
+                                    Icon(Icons.Default.Sync, null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("همگام‌سازی با فروشگاه", fontSize = 13.sp)
+                                }
                             }
-                        )
+                        }
+                    }
+                }
+                else -> {
+                    LazyColumn(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(horizontal = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        contentPadding = PaddingValues(bottom = if (selectedProducts.isNotEmpty()) 88.dp else 12.dp)
+                    ) {
+                        items(productsList, key = { it.id }) { product ->
+                            ProductItemCard(
+                                product = product,
+                                onEdit = { onNavigateToEdit(product.id) },
+                                onPriceChange = {
+                                    showQuickPriceDialog = product
+                                    regularPriceInput = product.regularPrice.toString()
+                                    salePriceInput = product.salePrice.toString()
+                                },
+                                onStockChange = {
+                                    showQuickStockDialog = product
+                                    stockInput = product.stockQuantity.toString()
+                                },
+                                onClone = { viewModel.cloneProduct(product); Toast.makeText(context, "پیش‌نویس کپی ایجاد شد", Toast.LENGTH_SHORT).show() },
+                                onIncrementStock = { viewModel.updateProductStock(product.id, product.stockQuantity + 1) },
+                                onDecrementStock = { viewModel.updateProductStock(product.id, (product.stockQuantity - 1).coerceAtLeast(0)) },
+                                isSelected = product.id in selectedProducts,
+                                showCheckbox = bulkPriceMode,
+                                onToggleSelect = {
+                                    selectedProducts = if (product.id in selectedProducts)
+                                        selectedProducts - product.id else selectedProducts + product.id
+                                }
+                            )
+                        }
                     }
                 }
             }
