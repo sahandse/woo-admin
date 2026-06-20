@@ -1,4 +1,4 @@
-package com.example.core.network
+package com.sahand.wooadmin.core.network
 
 import android.util.Log
 import kotlinx.coroutines.Dispatchers

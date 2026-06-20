@@ -1,4 +1,4 @@
-package com.example.ui.screens
+package com.sahand.wooadmin.ui.screens
 
 import android.widget.Toast
 import androidx.compose.animation.*
@@ -37,15 +37,15 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.foundation.Canvas
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.core.utils.Helpers
-import com.example.data.AdminActivity
-import com.example.data.OrderStatus
-import com.example.data.WooCoupon
-import com.example.data.WooOrder
-import com.example.ui.theme.GreenMoney
-import com.example.ui.theme.RedError
-import com.example.ui.theme.YellowWarn
-import com.example.ui.viewmodel.WooViewModel
+import com.sahand.wooadmin.core.utils.Helpers
+import com.sahand.wooadmin.data.AdminActivity
+import com.sahand.wooadmin.data.OrderStatus
+import com.sahand.wooadmin.data.WooCoupon
+import com.sahand.wooadmin.data.WooOrder
+import com.sahand.wooadmin.ui.theme.GreenMoney
+import com.sahand.wooadmin.ui.theme.RedError
+import com.sahand.wooadmin.ui.theme.YellowWarn
+import com.sahand.wooadmin.ui.viewmodel.WooViewModel
 
 // ==========================================
 // 1. MAIN SYSTEM DASHBOARD SCREEN
@@ -2077,7 +2077,7 @@ fun AdminUsersScreen(viewModel: WooViewModel, onBack: () -> Unit) {
                         onClick = {
                             if (newName.isNotBlank() && newUsername.isNotBlank()) {
                                 viewModel.addAdminUser(
-                                    com.example.data.AdminUser(
+                                    com.sahand.wooadmin.data.AdminUser(
                                         fullName = newName,
                                         username = newUsername,
                                         role = newRole,

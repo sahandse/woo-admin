@@ -1,4 +1,4 @@
-package com.example
+package com.sahand.wooadmin
 
 import android.os.Bundle
 import androidx.activity.compose.setContent
@@ -14,10 +14,10 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
-import com.example.ui.screens.LoginScreen
-import com.example.ui.screens.MainAppContainer
-import com.example.ui.theme.MyApplicationTheme
-import com.example.ui.viewmodel.WooViewModel
+import com.sahand.wooadmin.ui.screens.LoginScreen
+import com.sahand.wooadmin.ui.screens.MainAppContainer
+import com.sahand.wooadmin.ui.theme.MyApplicationTheme
+import com.sahand.wooadmin.ui.viewmodel.WooViewModel
 
 class MainActivity : FragmentActivity() {
 

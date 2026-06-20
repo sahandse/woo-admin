@@ -1,4 +1,4 @@
-package com.example
+package com.sahand.wooadmin
 
 import org.junit.Assert.*
 import org.junit.Test

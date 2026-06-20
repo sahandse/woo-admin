@@ -1,4 +1,4 @@
-package com.example.ui.screens
+package com.sahand.wooadmin.ui.screens
 
 import android.widget.Toast
 import androidx.compose.animation.*
@@ -25,9 +25,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.ui.theme.RedError
-import com.example.ui.theme.YellowWarn
-import com.example.ui.viewmodel.WooViewModel
+import com.sahand.wooadmin.ui.theme.RedError
+import com.sahand.wooadmin.ui.theme.YellowWarn
+import com.sahand.wooadmin.ui.viewmodel.WooViewModel
 
 // Sealed representations of routes
 sealed class Screen {

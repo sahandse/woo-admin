@@ -1,4 +1,4 @@
-package com.example.ui.screens
+package com.sahand.wooadmin.ui.screens
 
 import android.content.Intent
 import android.net.Uri
@@ -33,13 +33,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.core.utils.Helpers
-import com.example.data.OrderStatus
-import com.example.data.WooOrder
-import com.example.ui.theme.GreenMoney
-import com.example.ui.theme.RedError
-import com.example.ui.theme.YellowWarn
-import com.example.ui.viewmodel.WooViewModel
+import com.sahand.wooadmin.core.utils.Helpers
+import com.sahand.wooadmin.data.OrderStatus
+import com.sahand.wooadmin.data.WooOrder
+import com.sahand.wooadmin.ui.theme.GreenMoney
+import com.sahand.wooadmin.ui.theme.RedError
+import com.sahand.wooadmin.ui.theme.YellowWarn
+import com.sahand.wooadmin.ui.viewmodel.WooViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

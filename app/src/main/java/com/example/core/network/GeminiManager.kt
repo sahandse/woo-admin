@@ -1,7 +1,7 @@
-package com.example.core.network
+package com.sahand.wooadmin.core.network
 
 import android.util.Log
-import com.example.BuildConfig
+import com.sahand.wooadmin.BuildConfig
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import kotlinx.coroutines.Dispatchers

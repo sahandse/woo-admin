@@ -1,4 +1,4 @@
-package com.example.ui.screens
+package com.sahand.wooadmin.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
@@ -30,9 +30,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.ui.theme.AdminBluePrimary
-import com.example.ui.theme.RedError
-import com.example.ui.viewmodel.WooViewModel
+import com.sahand.wooadmin.ui.theme.AdminBluePrimary
+import com.sahand.wooadmin.ui.theme.RedError
+import com.sahand.wooadmin.ui.viewmodel.WooViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

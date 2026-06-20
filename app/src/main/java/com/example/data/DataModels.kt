@@ -1,4 +1,4 @@
-package com.example.data
+package com.sahand.wooadmin.data
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
@@ -103,7 +103,19 @@ data class WooProduct(
     val status: String = "publish", // publish, draft
     val colors: List<String> = emptyList(),
     val sizes: List<String> = emptyList(),
-    val warehouseNote: String = ""
+    val warehouseNote: String = "",
+    // Advanced fields
+    val purchaseNote: String = "",
+    val backorders: String = "no", // no, notify, yes
+    val soldIndividually: Boolean = false,
+    val externalUrl: String = "",
+    val buttonText: String = "",
+    val seoTitle: String = "",
+    val seoDescription: String = "",
+    val minQuantity: Int = 1,
+    val maxQuantity: Int = 0, // 0 = unlimited
+    val linkedUpsells: String = "", // comma-separated product IDs
+    val linkedCrossSells: String = "" // comma-separated product IDs
 )
 
 // --- CUSTOMER ENTITY ---

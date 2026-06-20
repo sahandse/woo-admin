@@ -1,4 +1,4 @@
-package com.example.ui.screens
+package com.sahand.wooadmin.ui.screens
 
 import android.widget.Toast
 import androidx.compose.animation.*
@@ -35,12 +35,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
 import coil.compose.AsyncImage
-import com.example.core.utils.Helpers
-import com.example.data.WooProduct
-import com.example.ui.theme.GreenMoney
-import com.example.ui.theme.RedError
-import com.example.ui.theme.YellowWarn
-import com.example.ui.viewmodel.WooViewModel
+import com.sahand.wooadmin.core.utils.Helpers
+import com.sahand.wooadmin.data.WooProduct
+import com.sahand.wooadmin.ui.theme.GreenMoney
+import com.sahand.wooadmin.ui.theme.RedError
+import com.sahand.wooadmin.ui.theme.YellowWarn
+import com.sahand.wooadmin.ui.viewmodel.WooViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -1202,8 +1202,14 @@ fun AddEditProductScreen(
     val productsList by viewModel.products.collectAsState()
     val product = productId?.let { pId -> productsList.find { it.id == pId } }
 
-    // Product type: 0=Simple, 1=Variable
-    var productType by remember { mutableStateOf(if ((product?.colors?.isNotEmpty() == true) || (product?.sizes?.isNotEmpty() == true)) 1 else 0) }
+    // Product type: 0=Simple, 1=Variable, 2=External
+    var productType by remember { mutableStateOf(
+        when {
+            product?.externalUrl?.isNotBlank() == true -> 2
+            (product?.colors?.isNotEmpty() == true) || (product?.sizes?.isNotEmpty() == true) -> 1
+            else -> 0
+        }
+    ) }
 
     // Basic info
     var name by remember { mutableStateOf(product?.name ?: "") }
@@ -1257,6 +1263,30 @@ fun AddEditProductScreen(
     var sizeInput by remember { mutableStateOf("") }
     var sizeList by remember { mutableStateOf<List<String>>(product?.sizes ?: emptyList()) }
 
+    // Sale schedule
+    var isPromoActive by remember { mutableStateOf(product?.isPromoActive ?: false) }
+    var promoStart by remember { mutableStateOf(product?.promoStartJalali ?: "") }
+    var promoEnd by remember { mutableStateOf(product?.promoEndJalali ?: "") }
+
+    // Stock policy
+    var backorders by remember { mutableStateOf(product?.backorders ?: "no") }
+    var soldIndividually by remember { mutableStateOf(product?.soldIndividually ?: false) }
+    var minQuantity by remember { mutableStateOf(product?.minQuantity?.toString() ?: "1") }
+    var maxQuantity by remember { mutableStateOf(product?.maxQuantity?.takeIf { it > 0 }?.toString() ?: "") }
+
+    // External/Affiliate
+    var externalUrl by remember { mutableStateOf(product?.externalUrl ?: "") }
+    var buttonText by remember { mutableStateOf(product?.buttonText ?: "") }
+
+    // Purchase note & SEO
+    var purchaseNote by remember { mutableStateOf(product?.purchaseNote ?: "") }
+    var seoTitle by remember { mutableStateOf(product?.seoTitle ?: "") }
+    var seoDescription by remember { mutableStateOf(product?.seoDescription ?: "") }
+
+    // Linked products
+    var upsellsInput by remember { mutableStateOf(product?.linkedUpsells ?: "") }
+    var crossSellsInput by remember { mutableStateOf(product?.linkedCrossSells ?: "") }
+
     val context = LocalContext.current
     val displayMainImage: Any? = mainImageUri ?: mainImageUrl.takeIf { it.isNotBlank() }
 
@@ -1303,16 +1333,23 @@ fun AddEditProductScreen(
                             val finalProduct = WooProduct(
                                 id = product?.id ?: System.currentTimeMillis(),
                                 name = name.trim(),
-                                slug = name.trim().replace(" ", "-"),
+                                slug = name.trim().lowercase().replace(" ", "-"),
                                 shortDescription = shortDesc,
                                 description = desc,
                                 regularPrice = regularPrice.toLongOrNull() ?: 0,
                                 salePrice = if (hasSalePrice) salePrice.toLongOrNull() ?: 0 else 0,
+                                isPromoActive = hasSalePrice && isPromoActive,
+                                promoStartJalali = if (hasSalePrice && isPromoActive) promoStart else "",
+                                promoEndJalali = if (hasSalePrice && isPromoActive) promoEnd else "",
                                 sku = sku,
                                 manageStock = true,
                                 stockQuantity = stockQuantity.toIntOrNull() ?: 0,
                                 inStock = (stockQuantity.toIntOrNull() ?: 0) > 0,
                                 lowStockThreshold = lowThreshold.toIntOrNull() ?: 3,
+                                backorders = backorders,
+                                soldIndividually = soldIndividually,
+                                minQuantity = minQuantity.toIntOrNull() ?: 1,
+                                maxQuantity = maxQuantity.toIntOrNull() ?: 0,
                                 weight = weight.toDoubleOrNull() ?: 0.0,
                                 length = length.toDoubleOrNull() ?: 0.0,
                                 width = width.toDoubleOrNull() ?: 0.0,
@@ -1327,7 +1364,14 @@ fun AddEditProductScreen(
                                 isFeatured = isFeatured,
                                 colors = colorList,
                                 sizes = sizeList,
-                                warehouseNote = warehouseNote
+                                warehouseNote = warehouseNote,
+                                externalUrl = if (productType == 2) externalUrl else "",
+                                buttonText = if (productType == 2) buttonText else "",
+                                purchaseNote = purchaseNote,
+                                seoTitle = seoTitle,
+                                seoDescription = seoDescription,
+                                linkedUpsells = upsellsInput.trim(),
+                                linkedCrossSells = crossSellsInput.trim()
                             )
                             if (product != null) {
                                 viewModel.editProduct(finalProduct)
@@ -1369,7 +1413,7 @@ fun AddEditProductScreen(
                         .padding(horizontal = 16.dp, vertical = 12.dp),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    listOf("محصول ساده" to 0, "محصول متغیر" to 1).forEach { (label, idx) ->
+                    listOf("محصول ساده" to 0, "محصول متغیر" to 1, "خارجی/پورسانتی" to 2).forEach { (label, idx) ->
                         val selected = productType == idx
                         Box(
                             modifier = Modifier
@@ -1761,6 +1805,51 @@ fun AddEditProductScreen(
                     }
                 }
 
+                // ── SALE SCHEDULE ──
+                AnimatedVisibility(visible = hasSalePrice) {
+                    Column {
+                        ProductSectionHeader("زمان‌بندی حراج", Icons.Default.Schedule)
+                        Column(
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("تعیین بازه زمانی حراج", fontSize = 13.sp)
+                                Switch(checked = isPromoActive, onCheckedChange = { isPromoActive = it })
+                            }
+                            AnimatedVisibility(visible = isPromoActive) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    OutlinedTextField(
+                                        value = promoStart,
+                                        onValueChange = { promoStart = it },
+                                        label = { Text("از تاریخ (شمسی)", fontSize = 11.sp) },
+                                        modifier = Modifier.weight(1f),
+                                        shape = RoundedCornerShape(10.dp),
+                                        singleLine = true,
+                                        leadingIcon = { Icon(Icons.Default.DateRange, null, modifier = Modifier.size(16.dp)) }
+                                    )
+                                    OutlinedTextField(
+                                        value = promoEnd,
+                                        onValueChange = { promoEnd = it },
+                                        label = { Text("تا تاریخ (شمسی)", fontSize = 11.sp) },
+                                        modifier = Modifier.weight(1f),
+                                        shape = RoundedCornerShape(10.dp),
+                                        singleLine = true,
+                                        leadingIcon = { Icon(Icons.Default.DateRange, null, modifier = Modifier.size(16.dp)) }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
                 // ── INVENTORY ──
                 ProductSectionHeader("موجودی انبار", Icons.Default.Inventory)
 
@@ -1800,6 +1889,63 @@ fun AddEditProductScreen(
                         singleLine = true,
                         leadingIcon = { Icon(Icons.Default.LocationOn, null, modifier = Modifier.size(18.dp)) }
                     )
+                }
+
+                // ── STOCK POLICY ──
+                ProductSectionHeader("سیاست انبار", Icons.Default.Policy)
+                Column(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text("سفارش در صورت اتمام موجودی", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                    listOf("no" to "غیرمجاز", "notify" to "با اطلاع‌رسانی", "yes" to "مجاز").forEach { (value, label) ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(if (backorders == value) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f) else Color.Transparent)
+                                .clickable { backorders = value }
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            RadioButton(selected = backorders == value, onClick = { backorders = value })
+                            Text(label, fontSize = 13.sp)
+                        }
+                    }
+                    HorizontalDivider()
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("فروش به صورت تکی (بدون امکان چندتایی)", fontSize = 13.sp)
+                        Switch(checked = soldIndividually, onCheckedChange = { soldIndividually = it })
+                    }
+                    HorizontalDivider()
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = minQuantity,
+                            onValueChange = { minQuantity = it.filter { c -> c.isDigit() } },
+                            label = { Text("حداقل تعداد سفارش") },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(10.dp),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true
+                        )
+                        OutlinedTextField(
+                            value = maxQuantity,
+                            onValueChange = { maxQuantity = it.filter { c -> c.isDigit() } },
+                            label = { Text("حداکثر (خالی=نامحدود)") },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(10.dp),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true
+                        )
+                    }
                 }
 
                 // ── SHIPPING DIMENSIONS (hidden for virtual) ──
@@ -2034,6 +2180,36 @@ fun AddEditProductScreen(
                     }
                 }
 
+                // ── EXTERNAL/AFFILIATE ──
+                AnimatedVisibility(visible = productType == 2) {
+                    Column {
+                        ProductSectionHeader("محصول خارجی / پورسانتی", Icons.Default.OpenInNew)
+                        Column(
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            OutlinedTextField(
+                                value = externalUrl,
+                                onValueChange = { externalUrl = it },
+                                label = { Text("URL محصول خارجی") },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(10.dp),
+                                singleLine = true,
+                                leadingIcon = { Icon(Icons.Default.Link, null, modifier = Modifier.size(18.dp)) }
+                            )
+                            OutlinedTextField(
+                                value = buttonText,
+                                onValueChange = { buttonText = it },
+                                label = { Text("متن دکمه خرید (مثلاً: خرید از سایت)") },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(10.dp),
+                                singleLine = true,
+                                leadingIcon = { Icon(Icons.Default.TouchApp, null, modifier = Modifier.size(18.dp)) }
+                            )
+                        }
+                    }
+                }
+
                 // ── FULL DESCRIPTION ──
                 ProductSectionHeader("توضیحات کامل", Icons.Default.Description)
 
@@ -2048,6 +2224,76 @@ fun AddEditProductScreen(
                     maxLines = 12,
                     shape = RoundedCornerShape(10.dp)
                 )
+
+                // ── PURCHASE NOTE ──
+                ProductSectionHeader("یادداشت پس از خرید", Icons.Default.StickyNote2)
+                OutlinedTextField(
+                    value = purchaseNote,
+                    onValueChange = { purchaseNote = it },
+                    label = { Text("پیام به مشتری پس از خرید") },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    minLines = 2,
+                    maxLines = 4,
+                    shape = RoundedCornerShape(10.dp)
+                )
+
+                // ── SEO ──
+                ProductSectionHeader("سئو و اسلاگ", Icons.Default.TravelExplore)
+                Column(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    OutlinedTextField(
+                        value = seoTitle,
+                        onValueChange = { seoTitle = it },
+                        label = { Text("عنوان سئو (SEO Title)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp),
+                        singleLine = true,
+                        leadingIcon = { Icon(Icons.Default.Title, null, modifier = Modifier.size(18.dp)) },
+                        supportingText = { Text("${seoTitle.length}/60", fontSize = 10.sp) }
+                    )
+                    OutlinedTextField(
+                        value = seoDescription,
+                        onValueChange = { seoDescription = it },
+                        label = { Text("توضیح متا (Meta Description)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp),
+                        minLines = 2,
+                        maxLines = 3,
+                        supportingText = { Text("${seoDescription.length}/160", fontSize = 10.sp) }
+                    )
+                }
+
+                // ── LINKED PRODUCTS ──
+                ProductSectionHeader("محصولات مرتبط", Icons.Default.Link)
+                Column(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    OutlinedTextField(
+                        value = upsellsInput,
+                        onValueChange = { upsellsInput = it },
+                        label = { Text("Upsells (شناسه‌ها با کاما جدا شوند)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp),
+                        singleLine = true,
+                        leadingIcon = { Icon(Icons.Default.TrendingUp, null, modifier = Modifier.size(18.dp)) },
+                        supportingText = { Text("مثال: 12, 34, 56", fontSize = 10.sp) }
+                    )
+                    OutlinedTextField(
+                        value = crossSellsInput,
+                        onValueChange = { crossSellsInput = it },
+                        label = { Text("Cross-sells (شناسه‌ها با کاما)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp),
+                        singleLine = true,
+                        leadingIcon = { Icon(Icons.Default.SwapHoriz, null, modifier = Modifier.size(18.dp)) },
+                        supportingText = { Text("مثال: 78, 90", fontSize = 10.sp) }
+                    )
+                }
 
                 Spacer(Modifier.height(24.dp))
             }

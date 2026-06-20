@@ -7,11 +7,11 @@ plugins {
 }
 
 android {
-  namespace = "com.example"
+  namespace = "com.sahand.wooadmin"
   compileSdk { version = release(36) { minorApiLevel = 1 } }
 
   defaultConfig {
-    applicationId = "com.aistudio.woopanel.qshvzw"
+    applicationId = "com.sahand.wooadmin"
     minSdk = 24
     targetSdk = 36
     versionCode = 5

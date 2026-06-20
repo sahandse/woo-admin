@@ -1,9 +1,9 @@
-package com.example.data
+package com.sahand.wooadmin.data
 
 import android.content.Context
 import android.util.Log
-import com.example.core.utils.Helpers
-import com.example.core.utils.JalaliCalendar
+import com.sahand.wooadmin.core.utils.Helpers
+import com.sahand.wooadmin.core.utils.JalaliCalendar
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.firstOrNull
@@ -283,7 +283,7 @@ class WooRepository(private val db: AppDatabase, private val context: Context) {
         )
     }
 
-    suspend fun sendMeliPayamakSms(recipientPhone: String, messageText: String): com.example.core.network.SmsResult = withContext(Dispatchers.IO) {
+    suspend fun sendMeliPayamakSms(recipientPhone: String, messageText: String): com.sahand.wooadmin.core.network.SmsResult = withContext(Dispatchers.IO) {
         val username = melipayamakUsername
         val password = melipayamakPassword
         val sender = melipayamakSender
@@ -291,15 +291,15 @@ class WooRepository(private val db: AppDatabase, private val context: Context) {
         if (isDemoMode || username.isBlank() || password.isBlank()) {
             val simulationMsg = "شبیه‌سازی ارسال پیامک به $recipientPhone: $messageText"
             logActivity("SEND_SMS", "شبیه‌سازی ملی‌پیامک: ارسال پیامک به $recipientPhone انجام شد. (متن: $messageText)")
-            return@withContext com.example.core.network.SmsResult.Success("حالت آزمایشی فعال است. پیامک ارسال و ثبت شد.", simulationMsg)
+            return@withContext com.sahand.wooadmin.core.network.SmsResult.Success("حالت آزمایشی فعال است. پیامک ارسال و ثبت شد.", simulationMsg)
         }
 
-        val result = com.example.core.network.MeliPayamakService.sendSms(username, password, recipientPhone, sender, messageText)
+        val result = com.sahand.wooadmin.core.network.MeliPayamakService.sendSms(username, password, recipientPhone, sender, messageText)
         when (result) {
-            is com.example.core.network.SmsResult.Success -> {
+            is com.sahand.wooadmin.core.network.SmsResult.Success -> {
                 logActivity("SEND_SMS", "ملی‌پیامک - ارسال پیامک موفق به $recipientPhone. (متن: $messageText)")
             }
-            is com.example.core.network.SmsResult.Error -> {
+            is com.sahand.wooadmin.core.network.SmsResult.Error -> {
                 logActivity("SEND_SMS", "ملی‌پیامک - ارسال پیامک ناموفق به $recipientPhone. علت: ${result.errorMessage}")
             }
         }

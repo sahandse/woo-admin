@@ -1,4 +1,4 @@
-package com.example.data
+package com.sahand.wooadmin.data
 
 import android.content.Context
 import androidx.room.Database
@@ -17,7 +17,7 @@ import androidx.room.TypeConverters
         AdminUser::class,
         AdminActivity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 @TypeConverters(RoomTypeConverters::class)

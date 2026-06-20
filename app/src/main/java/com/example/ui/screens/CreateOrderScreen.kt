@@ -1,4 +1,4 @@
-package com.example.ui.screens
+package com.sahand.wooadmin.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
@@ -25,9 +25,9 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
-import com.example.core.utils.Helpers
-import com.example.data.WooProduct
-import com.example.ui.viewmodel.WooViewModel
+import com.sahand.wooadmin.core.utils.Helpers
+import com.sahand.wooadmin.data.WooProduct
+import com.sahand.wooadmin.ui.viewmodel.WooViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

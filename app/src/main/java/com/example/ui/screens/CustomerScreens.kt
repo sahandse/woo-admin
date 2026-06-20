@@ -1,4 +1,4 @@
-package com.example.ui.screens
+package com.sahand.wooadmin.ui.screens
 
 import android.content.Intent
 import android.net.Uri
@@ -31,11 +31,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.core.utils.Helpers
-import com.example.data.CustomerCategory
-import com.example.data.WooCustomer
-import com.example.ui.theme.GreenMoney
-import com.example.ui.viewmodel.WooViewModel
+import com.sahand.wooadmin.core.utils.Helpers
+import com.sahand.wooadmin.data.CustomerCategory
+import com.sahand.wooadmin.data.OrderStatus
+import com.sahand.wooadmin.data.WooCustomer
+import com.sahand.wooadmin.ui.theme.GreenMoney
+import com.sahand.wooadmin.ui.theme.RedError
+import com.sahand.wooadmin.ui.theme.YellowWarn
+import com.sahand.wooadmin.ui.viewmodel.WooViewModel
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -476,11 +479,11 @@ fun CustomersScreen(
                                     val result = viewModel.sendSmsToCustomer(customPhoneInput, smsBodyText)
                                     isSendingQuickSms = false
                                     when (result) {
-                                        is com.example.core.network.SmsResult.Success -> {
+                                        is com.sahand.wooadmin.core.network.SmsResult.Success -> {
                                             Toast.makeText(context, result.message, Toast.LENGTH_LONG).show()
                                             showQuickSmsDialog = false
                                         }
-                                        is com.example.core.network.SmsResult.Error -> {
+                                        is com.sahand.wooadmin.core.network.SmsResult.Error -> {
                                             Toast.makeText(context, result.errorMessage, Toast.LENGTH_LONG).show()
                                         }
                                     }
@@ -504,9 +507,9 @@ fun CustomersScreen(
                                     targets.forEach { targetCustomer ->
                                         val personalizedMsg = smsBodyText.replace("{name}", "${targetCustomer.firstName} ${targetCustomer.lastName}".trim())
                                         val result = viewModel.sendSmsToCustomer(targetCustomer.phone, personalizedMsg)
-                                        if (result is com.example.core.network.SmsResult.Success) {
+                                        if (result is com.sahand.wooadmin.core.network.SmsResult.Success) {
                                             successCount++
-                                        } else if (result is com.example.core.network.SmsResult.Error) {
+                                        } else if (result is com.sahand.wooadmin.core.network.SmsResult.Error) {
                                             errorMsg = result.errorMessage
                                         }
                                     }
@@ -648,6 +651,14 @@ fun CustomerDetailsScreen(
 ) {
     val customersList by viewModel.customers.collectAsState()
     val customer = customersList.find { it.id == customerId }
+    val allOrders by viewModel.orders.collectAsState()
+    val customerOrders = remember(allOrders, customer) {
+        if (customer == null) emptyList()
+        else allOrders.filter { o ->
+            o.customerPhone == customer.phone ||
+            (!customer.email.isBlank() && o.customerEmail.equals(customer.email, ignoreCase = true))
+        }.sortedByDescending { it.id }
+    }
     val context = LocalContext.current
 
     var internalNotes by remember { mutableStateOf(customer?.internalNotes ?: "") }
@@ -834,6 +845,110 @@ fun CustomerDetailsScreen(
                     }
                 }
 
+                // ── ORDER HISTORY ──
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                ) {
+                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("تاریخچه سفارش‌ها", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            Text(
+                                "${Helpers.toPersianDigits(customerOrders.size.toString())} سفارش",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f))
+
+                        if (customerOrders.isEmpty()) {
+                            Box(
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 20.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("سفارشی برای این مشتری ثبت نشده", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f))
+                            }
+                        } else {
+                            customerOrders.forEach { order ->
+                                val statusEnum = OrderStatus.values().find { it.name == order.status }
+                                val statusColor = try {
+                                    Color(android.graphics.Color.parseColor(statusEnum?.colorHex ?: "#9E9E9E"))
+                                } catch (e: Exception) { Color.Gray }
+
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+                                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                        Text(
+                                            "سفارش #${order.orderNumber}",
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Text(
+                                            order.createdAtJalali,
+                                            fontSize = 10.sp,
+                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
+                                        )
+                                    }
+                                    Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        Text(
+                                            Helpers.formatPrice(order.totalAmount),
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = GreenMoney
+                                        )
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(6.dp))
+                                                .background(statusColor.copy(alpha = 0.12f))
+                                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                                        ) {
+                                            Text(
+                                                statusEnum?.persianLabel ?: order.status,
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = statusColor
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Total stats from actual orders
+                        if (customerOrders.isNotEmpty()) {
+                            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f))
+                            val totalFromOrders = customerOrders.sumOf { it.totalAmount }
+                            val avgFromOrders = totalFromOrders / customerOrders.size
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column {
+                                    Text("جمع کل واقعی", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f))
+                                    Text(Helpers.formatPrice(totalFromOrders), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = GreenMoney)
+                                }
+                                Column(horizontalAlignment = Alignment.End) {
+                                    Text("متوسط هر سفارش", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f))
+                                    Text(Helpers.formatPrice(avgFromOrders), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
+                }
+
                 Spacer(modifier = Modifier.height(24.dp))
             }
         }
@@ -1001,11 +1116,11 @@ fun CustomerDetailsScreen(
                                 val result = viewModel.sendSmsToCustomer(customer.phone, smsText)
                                 isSendingSms = false
                                 when (result) {
-                                    is com.example.core.network.SmsResult.Success -> {
+                                    is com.sahand.wooadmin.core.network.SmsResult.Success -> {
                                         Toast.makeText(context, result.message, Toast.LENGTH_LONG).show()
                                         showSmsDialog = false
                                     }
-                                    is com.example.core.network.SmsResult.Error -> {
+                                    is com.sahand.wooadmin.core.network.SmsResult.Error -> {
                                         Toast.makeText(context, result.errorMessage, Toast.LENGTH_LONG).show()
                                     }
                                 }

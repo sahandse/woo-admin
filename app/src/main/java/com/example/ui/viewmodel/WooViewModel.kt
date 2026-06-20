@@ -1,13 +1,13 @@
-package com.example.ui.viewmodel
+package com.sahand.wooadmin.ui.viewmodel
 
 import android.app.Application
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.core.network.GeminiManager
-import com.example.core.utils.Helpers
-import com.example.core.utils.JalaliCalendar
-import com.example.data.*
+import com.sahand.wooadmin.core.network.GeminiManager
+import com.sahand.wooadmin.core.utils.Helpers
+import com.sahand.wooadmin.core.utils.JalaliCalendar
+import com.sahand.wooadmin.data.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -472,7 +472,7 @@ class WooViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // --- SMS ---
-    suspend fun sendSmsToCustomer(phone: String, text: String): com.example.core.network.SmsResult {
+    suspend fun sendSmsToCustomer(phone: String, text: String): com.sahand.wooadmin.core.network.SmsResult {
         return repository.sendMeliPayamakSms(phone, text)
     }
 
