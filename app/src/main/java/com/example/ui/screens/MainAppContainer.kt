@@ -84,7 +84,8 @@ fun MainAppContainer(
                             activeScreen is Screen.Products ||
                             activeScreen is Screen.Customers ||
                             activeScreen is Screen.Settings ||
-                            activeScreen is Screen.Tracking
+                            activeScreen is Screen.Tracking ||
+                            activeScreen is Screen.AiAnalyst
 
                 if (isTab) {
                     TopAppBar(
@@ -108,7 +109,7 @@ fun MainAppContainer(
                             // Notification bell with unread badge count
                             Box(
                                 modifier = Modifier
-                                    .padding(end = 8.dp)
+                                    .padding(end = 4.dp)
                                     .size(44.dp)
                                     .clip(CircleShape)
                                     .clickable { showNotifSheet = true },
@@ -137,6 +138,14 @@ fun MainAppContainer(
                                         )
                                     }
                                 }
+                            }
+                            // Settings icon — top-left in RTL layout
+                            IconButton(onClick = { activeScreen = Screen.Settings }) {
+                                Icon(
+                                    imageVector = Icons.Default.Settings,
+                                    contentDescription = "تنظیمات",
+                                    tint = MaterialTheme.colorScheme.onSurface
+                                )
                             }
                         },
                         colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
@@ -222,7 +231,6 @@ fun MainAppContainer(
                             activeScreen is Screen.Orders ||
                             activeScreen is Screen.Products ||
                             activeScreen is Screen.Customers ||
-                            activeScreen is Screen.Settings ||
                             activeScreen is Screen.Tracking
 
                 if (isTab) {
@@ -263,13 +271,6 @@ fun MainAppContainer(
                             onClick = { activeScreen = Screen.Tracking },
                             icon = { Icon(imageVector = Icons.Default.TrackChanges, contentDescription = "رهگیری") },
                             label = { Text("رهگیری", fontSize = 10.sp, fontWeight = FontWeight.Bold) }
-                        )
-
-                        NavigationBarItem(
-                            selected = activeScreen is Screen.Settings,
-                            onClick = { activeScreen = Screen.Settings },
-                            icon = { Icon(imageVector = Icons.Default.Settings, contentDescription = "تنظیمات") },
-                            label = { Text("تنظیمات", fontSize = 10.sp, fontWeight = FontWeight.Bold) }
                         )
                     }
                 }
