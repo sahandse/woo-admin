@@ -21,6 +21,10 @@ class WooRepository(private val db: AppDatabase, private val context: Context) {
         get() = sharedPrefs.getBoolean("is_demo_mode", false)
         set(value) = sharedPrefs.edit().putBoolean("is_demo_mode", value).apply()
 
+    var storeAllowInsecure: Boolean
+        get() = sharedPrefs.getBoolean("store_allow_insecure", false)
+        set(value) = sharedPrefs.edit().putBoolean("store_allow_insecure", value).apply()
+
     var jwtToken: String
         get() = sharedPrefs.getString("jwt_token", "demo_jwt_token") ?: "demo_jwt_token"
         set(value) = sharedPrefs.edit().putString("jwt_token", value).apply()

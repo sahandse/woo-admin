@@ -105,16 +105,15 @@ class WooViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch(Dispatchers.IO) {
             repository.seedDatabase()
 
-            val username = repository.activeAdminUsername
-            val user = db.adminUserDao().getAdminUserByUsername(username)
-            if (user != null) {
-                _loggedInUser.value = user
-                _isLoggedIn.value = true
-            }
-
-            // Auto-sync on startup if a store is already connected
+            // Only auto-login if there's an active store — no store means show login screen
             val activeStore = db.storeDao().getActiveStore()
             if (activeStore != null) {
+                val username = repository.activeAdminUsername
+                val user = db.adminUserDao().getAdminUserByUsername(username)
+                if (user != null) {
+                    _loggedInUser.value = user
+                    _isLoggedIn.value = true
+                }
                 runFullSync(activeStore)
                 startOrderPolling(activeStore)
             }
@@ -125,16 +124,21 @@ class WooViewModel(application: Application) : AndroidViewModel(application) {
 
     private suspend fun runFullSync(store: WooStore) {
         _isSyncing.value = true
+        var hadError = false
         try {
             WooCommerceSync.syncAll(
                 db = db,
                 baseUrl = store.url,
                 consumerKey = store.consumerKey,
                 consumerSecret = store.consumerSecret,
-                onProgress = { msg -> _syncMessage.value = msg }
+                onProgress = { msg ->
+                    _syncMessage.value = msg
+                    if (msg.contains("مشکل") || msg.contains("خطا")) hadError = true
+                },
+                trustAll = repository.storeAllowInsecure
             )
             _lastSyncTime.value = JalaliCalendar.getCurrentTime()
-            _syncMessage.value = "همگام‌سازی کامل انجام شد"
+            if (!hadError) _syncMessage.value = null
         } catch (e: Exception) {
             _syncMessage.value = "خطا در همگام‌سازی: ${e.localizedMessage}"
             Log.e("WooSync", "Full sync failed", e)
@@ -153,7 +157,8 @@ class WooViewModel(application: Application) : AndroidViewModel(application) {
                         db = db,
                         baseUrl = store.url,
                         consumerKey = store.consumerKey,
-                        consumerSecret = store.consumerSecret
+                        consumerSecret = store.consumerSecret,
+                        trustAll = repository.storeAllowInsecure
                     )
                     if (newOrders.isNotEmpty()) {
                         val today = JalaliCalendar.getTodayJalali().toString()
@@ -208,7 +213,8 @@ class WooViewModel(application: Application) : AndroidViewModel(application) {
                     baseUrl = activeStore.url,
                     consumerKey = activeStore.consumerKey,
                     consumerSecret = activeStore.consumerSecret,
-                    onProgress = { msg -> _syncMessage.value = msg }
+                    onProgress = { msg -> _syncMessage.value = msg },
+                    trustAll = repository.storeAllowInsecure
                 )
                 _syncMessage.value = "پاکسازی کامل شد: ${result.productsRemoved} محصول و ${result.ordersRemoved} سفارش حذف شدند"
             } catch (e: Exception) {
@@ -228,7 +234,8 @@ class WooViewModel(application: Application) : AndroidViewModel(application) {
                     db = db,
                     baseUrl = activeStore.url,
                     consumerKey = activeStore.consumerKey,
-                    consumerSecret = activeStore.consumerSecret
+                    consumerSecret = activeStore.consumerSecret,
+                    trustAll = repository.storeAllowInsecure
                 )
                 val today = JalaliCalendar.getTodayJalali().toString()
                 for (order in newOrders) {
@@ -524,6 +531,9 @@ class WooViewModel(application: Application) : AndroidViewModel(application) {
 
                 onProgressUpdate("اتصال به سرور و احراز هویت...")
 
+                // Save SSL bypass setting before sync
+                repository.storeAllowInsecure = !isHttpsOnly
+
                 val newStore = WooStore(
                     name = storeName,
                     url = storeUrl,
@@ -543,12 +553,17 @@ class WooViewModel(application: Application) : AndroidViewModel(application) {
                 )
                 db.adminUserDao().insertAdminUser(user)
 
+                var syncErrorMsg: String? = null
                 WooCommerceSync.syncAll(
                     db = db,
                     baseUrl = storeUrl,
                     consumerKey = consumerKey,
                     consumerSecret = consumerSecret,
-                    onProgress = { msg -> onProgressUpdate(msg) }
+                    onProgress = { msg ->
+                        onProgressUpdate(msg)
+                        if (msg.contains("مشکل") || msg.contains("خطا")) syncErrorMsg = msg
+                    },
+                    trustAll = !isHttpsOnly
                 )
 
                 val today = JalaliCalendar.getTodayJalali().toString()
@@ -571,7 +586,10 @@ class WooViewModel(application: Application) : AndroidViewModel(application) {
                 val savedStore = db.storeDao().getActiveStore()
                 if (savedStore != null) startOrderPolling(savedStore)
 
-                onProgressUpdate("همگام‌سازی با موفقیت انجام شد!")
+                if (syncErrorMsg != null) {
+                    _syncMessage.value = syncErrorMsg
+                }
+                onProgressUpdate(if (syncErrorMsg == null) "همگام‌سازی با موفقیت انجام شد!" else "اتصال برقرار شد، برخی داده‌ها بارگذاری نشدند")
                 onSuccess()
             } catch (e: Exception) {
                 onError("خطا در برقراری ارتباط: ${e.localizedMessage}")

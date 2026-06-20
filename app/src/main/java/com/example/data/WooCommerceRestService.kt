@@ -1,5 +1,6 @@
 package com.sahand.wooadmin.data
 
+import android.annotation.SuppressLint
 import android.util.Log
 import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
@@ -14,7 +15,12 @@ import retrofit2.converter.moshi.MoshiConverterFactory
 import retrofit2.http.GET
 import retrofit2.http.Path
 import retrofit2.http.Query
+import java.security.SecureRandom
+import java.security.cert.X509Certificate
 import java.util.concurrent.TimeUnit
+import javax.net.ssl.SSLContext
+import javax.net.ssl.TrustManager
+import javax.net.ssl.X509TrustManager
 
 // --- WooCommerce REST API Response DTOs ---
 
@@ -186,10 +192,11 @@ interface WooCommerceRestApi {
 // --- Sync Engine ---
 object WooCommerceSync {
 
-    fun buildApi(baseUrl: String, consumerKey: String, consumerSecret: String): WooCommerceRestApi {
+    @SuppressLint("TrustAllX509TrustManager", "BadHostnameVerifier")
+    fun buildApi(baseUrl: String, consumerKey: String, consumerSecret: String, trustAll: Boolean = false): WooCommerceRestApi {
         val url = if (baseUrl.endsWith("/")) baseUrl else "$baseUrl/"
         val moshi = Moshi.Builder().addLast(KotlinJsonAdapterFactory()).build()
-        val client = OkHttpClient.Builder()
+        val clientBuilder = OkHttpClient.Builder()
             .addInterceptor { chain ->
                 val req = chain.request().newBuilder()
                     .header("Authorization", Credentials.basic(consumerKey, consumerSecret))
@@ -197,11 +204,23 @@ object WooCommerceSync {
                 chain.proceed(req)
             }
             .connectTimeout(30, TimeUnit.SECONDS)
-            .readTimeout(30, TimeUnit.SECONDS)
-            .build()
+            .readTimeout(60, TimeUnit.SECONDS)
+
+        if (trustAll) {
+            val trustAllCerts = arrayOf<TrustManager>(object : X509TrustManager {
+                override fun checkClientTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
+                override fun checkServerTrusted(chain: Array<out X509Certificate>?, authType: String?) {}
+                override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
+            })
+            val sslContext = SSLContext.getInstance("TLS")
+            sslContext.init(null, trustAllCerts, SecureRandom())
+            clientBuilder.sslSocketFactory(sslContext.socketFactory, trustAllCerts[0] as X509TrustManager)
+            clientBuilder.hostnameVerifier { _, _ -> true }
+        }
+
         return Retrofit.Builder()
             .baseUrl(url)
-            .client(client)
+            .client(clientBuilder.build())
             .addConverterFactory(MoshiConverterFactory.create(moshi))
             .build()
             .create(WooCommerceRestApi::class.java)
@@ -363,9 +382,10 @@ object WooCommerceSync {
         baseUrl: String,
         consumerKey: String,
         consumerSecret: String,
-        onProgress: (String) -> Unit
+        onProgress: (String) -> Unit,
+        trustAll: Boolean = false
     ): SmartCleanResult = withContext(Dispatchers.IO) {
-        val api = buildApi(baseUrl, consumerKey, consumerSecret)
+        val api = buildApi(baseUrl, consumerKey, consumerSecret, trustAll)
 
         onProgress("دریافت لیست محصولات از سایت...")
         val wcProductIds = try {
@@ -395,9 +415,10 @@ object WooCommerceSync {
         db: AppDatabase,
         baseUrl: String,
         consumerKey: String,
-        consumerSecret: String
+        consumerSecret: String,
+        trustAll: Boolean = false
     ): List<WooOrder> = withContext(Dispatchers.IO) {
-        val api = buildApi(baseUrl, consumerKey, consumerSecret)
+        val api = buildApi(baseUrl, consumerKey, consumerSecret, trustAll)
         val existingIds = db.orderDao().getAllOrderIds().toSet()
         val orders = api.getOrders()
         val mapped = orders.map { mapOrder(it) }
@@ -410,9 +431,10 @@ object WooCommerceSync {
         baseUrl: String,
         consumerKey: String,
         consumerSecret: String,
-        onProgress: (String) -> Unit
+        onProgress: (String) -> Unit,
+        trustAll: Boolean = false
     ) = withContext(Dispatchers.IO) {
-        val api = buildApi(baseUrl, consumerKey, consumerSecret)
+        val api = buildApi(baseUrl, consumerKey, consumerSecret, trustAll)
 
         try {
             onProgress("دریافت دسته‌بندی‌ها از ووکامرس...")

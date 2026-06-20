@@ -60,6 +60,8 @@ fun DashboardScreen(
     val productsList by viewModel.products.collectAsState(initial = emptyList())
     val customersList by viewModel.customers.collectAsState(initial = emptyList())
     val notificationsList by viewModel.notifications.collectAsState(initial = emptyList())
+    val isSyncing by viewModel.isSyncing.collectAsState()
+    val syncMessage by viewModel.syncMessage.collectAsState()
 
     val unreadNewOrders = notificationsList.filter { !it.isRead && it.type == "NEW_ORDER" }
     val lowStockProductsUnder5 = productsList.filter { it.manageStock && it.stockQuantity < 5 }
@@ -83,6 +85,57 @@ fun DashboardScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Spacer(modifier = Modifier.height(4.dp))
+
+            // Sync status banner
+            val syncError = syncMessage != null && (syncMessage!!.contains("خطا") || syncMessage!!.contains("مشکل"))
+            AnimatedVisibility(
+                visible = isSyncing || syncError,
+                enter = fadeIn() + slideInVertically { -it },
+                exit = fadeOut() + slideOutVertically { -it }
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(
+                            if (isSyncing) MaterialTheme.colorScheme.primaryContainer
+                            else RedError.copy(alpha = 0.1f)
+                        )
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    if (isSyncing) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.ErrorOutline,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = RedError
+                        )
+                    }
+                    Text(
+                        text = if (isSyncing) (syncMessage ?: "در حال همگام‌سازی...") else (syncMessage ?: ""),
+                        fontSize = 12.sp,
+                        color = if (isSyncing) MaterialTheme.colorScheme.onPrimaryContainer else RedError,
+                        modifier = Modifier.weight(1f)
+                    )
+                    if (!isSyncing && syncError) {
+                        TextButton(
+                            onClick = { viewModel.syncAllData() },
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Text("تلاش مجدد", fontSize = 11.sp)
+                        }
+                    }
+                }
+            }
 
             // 🔔 Heads-up Alert Banner for Live New Order Notifications
             AnimatedVisibility(
