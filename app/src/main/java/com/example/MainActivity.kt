@@ -1,10 +1,10 @@
 package com.example
 
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.fragment.app.FragmentActivity
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.compose.foundation.layout.Box
@@ -19,7 +19,7 @@ import com.example.ui.screens.MainAppContainer
 import com.example.ui.theme.MyApplicationTheme
 import com.example.ui.viewmodel.WooViewModel
 
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
 
     private val viewModel: WooViewModel by viewModels()
     private var appWentToBackground = false
