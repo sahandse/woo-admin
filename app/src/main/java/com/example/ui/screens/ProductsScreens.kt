@@ -1100,6 +1100,67 @@ fun ProductItemCard(
                     }
                 }
 
+                // Variant count + attribute chips (only for variable products)
+                if (isVariable) {
+                    Spacer(modifier = Modifier.height(5.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(5.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        // تعداد تنوع
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(MaterialTheme.colorScheme.secondaryContainer)
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = "${Helpers.toPersianDigits(product.variants.size.toString())} تنوع",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        }
+                        // موجودی کل واریانت‌ها
+                        val totalVariantStock = product.variants.sumOf { it.stockQty }
+                        val variantStockColor = if (totalVariantStock == 0) RedError
+                            else if (totalVariantStock <= product.variants.size * 2) YellowWarn
+                            else GreenMoney
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(variantStockColor.copy(alpha = 0.12f))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = "موجودی: ${Helpers.toPersianDigits(totalVariantStock.toString())}",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = variantStockColor
+                            )
+                        }
+                    }
+                    // نام ویژگی‌ها
+                    if (product.colors.isNotEmpty() || product.sizes.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(3.dp))
+                        val attrSummary = buildString {
+                            if (product.colors.isNotEmpty()) append("${product.colorAttributeName}: ${product.colors.take(3).joinToString("، ")}${if (product.colors.size > 3) " ..." else ""}")
+                            if (product.sizes.isNotEmpty()) {
+                                if (product.colors.isNotEmpty()) append(" | ")
+                                append("${product.sizeAttributeName}: ${product.sizes.take(3).joinToString("، ")}${if (product.sizes.size > 3) " ..." else ""}")
+                            }
+                        }
+                        Text(
+                            text = attrSummary,
+                            fontSize = 10.sp,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+
                 Spacer(modifier = Modifier.height(8.dp))
 
                 // Stock status indicator
