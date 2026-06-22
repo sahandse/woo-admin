@@ -1122,24 +1122,6 @@ fun ProductItemCard(
                                 color = MaterialTheme.colorScheme.onSecondaryContainer
                             )
                         }
-                        // موجودی کل واریانت‌ها
-                        val totalVariantStock = product.variants.sumOf { it.stockQty }
-                        val variantStockColor = if (totalVariantStock == 0) RedError
-                            else if (totalVariantStock <= product.variants.size * 2) YellowWarn
-                            else GreenMoney
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(variantStockColor.copy(alpha = 0.12f))
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                        ) {
-                            Text(
-                                text = "موجودی: ${Helpers.toPersianDigits(totalVariantStock.toString())}",
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = variantStockColor
-                            )
-                        }
                     }
                     // نام ویژگی‌ها
                     if (product.colors.isNotEmpty() || product.sizes.isNotEmpty()) {
@@ -1163,17 +1145,16 @@ fun ProductItemCard(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Stock status indicator
-                val stockColor = if (product.stockQuantity == 0) RedError 
-                    else if (product.stockQuantity <= product.lowStockThreshold) YellowWarn 
+                // Stock status — for variable products use sum of variant stocks
+                val effectiveStock = if (isVariable && product.stockQuantity == 0)
+                    product.variants.sumOf { it.stockQty }
+                else product.stockQuantity
+
+                val stockColor = if (effectiveStock == 0) RedError
+                    else if (effectiveStock <= product.lowStockThreshold) YellowWarn
                     else GreenMoney
-                
-                val stockText = if (product.stockQuantity == 0) "ناموجود در انبار"
-                    else if (product.stockQuantity <= product.lowStockThreshold) "رو به اتمام (${Helpers.toPersianDigits(product.stockQuantity)} عدد)"
-                    else "موجود در انبار (${Helpers.toPersianDigits(product.stockQuantity)} عدد)"
 
                 Column(modifier = Modifier.fillMaxWidth()) {
-                    // Inline stock editor row
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -1181,35 +1162,44 @@ fun ProductItemCard(
                     ) {
                         Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(stockColor))
                         Text(
-                            text = if (product.stockQuantity == 0) "ناموجود" else if (product.stockQuantity <= product.lowStockThreshold) "رو به اتمام" else "موجود",
+                            text = if (effectiveStock == 0) "ناموجود" else if (effectiveStock <= product.lowStockThreshold) "رو به اتمام" else "موجود",
                             color = stockColor,
                             fontSize = 10.sp,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.weight(1f)
                         )
-                        // Inline -/qty/+ controls
-                        Box(
-                            modifier = Modifier.size(20.dp).clip(CircleShape)
-                                .background(stockColor.copy(alpha = 0.12f))
-                                .clickable { onDecrementStock() },
-                            contentAlignment = Alignment.Center
-                        ) { Icon(Icons.Default.Remove, null, modifier = Modifier.size(12.dp), tint = stockColor) }
-                        Text(
-                            text = Helpers.toPersianDigits(product.stockQuantity.toString()),
-                            fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, color = stockColor,
-                            modifier = Modifier.padding(horizontal = 4.dp)
-                        )
-                        Box(
-                            modifier = Modifier.size(20.dp).clip(CircleShape)
-                                .background(stockColor.copy(alpha = 0.12f))
-                                .clickable { onIncrementStock() },
-                            contentAlignment = Alignment.Center
-                        ) { Icon(Icons.Default.Add, null, modifier = Modifier.size(12.dp), tint = stockColor) }
+                        if (isVariable) {
+                            // variable: فقط نمایش تعداد، بدون +/-
+                            Text(
+                                text = Helpers.toPersianDigits(effectiveStock.toString()),
+                                fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, color = stockColor,
+                                modifier = Modifier.padding(horizontal = 4.dp)
+                            )
+                        } else {
+                            // simple: کنترل +/-
+                            Box(
+                                modifier = Modifier.size(20.dp).clip(CircleShape)
+                                    .background(stockColor.copy(alpha = 0.12f))
+                                    .clickable { onDecrementStock() },
+                                contentAlignment = Alignment.Center
+                            ) { Icon(Icons.Default.Remove, null, modifier = Modifier.size(12.dp), tint = stockColor) }
+                            Text(
+                                text = Helpers.toPersianDigits(effectiveStock.toString()),
+                                fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, color = stockColor,
+                                modifier = Modifier.padding(horizontal = 4.dp)
+                            )
+                            Box(
+                                modifier = Modifier.size(20.dp).clip(CircleShape)
+                                    .background(stockColor.copy(alpha = 0.12f))
+                                    .clickable { onIncrementStock() },
+                                contentAlignment = Alignment.Center
+                            ) { Icon(Icons.Default.Add, null, modifier = Modifier.size(12.dp), tint = stockColor) }
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(4.dp))
-                    val progressFraction = if (product.stockQuantity == 0) 0f
-                        else if (product.stockQuantity <= product.lowStockThreshold) 0.35f else 1.0f
+                    val progressFraction = if (effectiveStock == 0) 0f
+                        else if (effectiveStock <= product.lowStockThreshold) 0.35f else 1.0f
                     LinearProgressIndicator(
                         progress = { progressFraction },
                         modifier = Modifier.fillMaxWidth(0.9f).height(3.dp).clip(RoundedCornerShape(2.dp)),

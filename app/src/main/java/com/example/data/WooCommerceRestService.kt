@@ -311,6 +311,13 @@ object WooCommerceSync {
             mappedVariants.filter { it.salePrice > 0 }.minOfOrNull { it.salePrice } ?: 0L
         else parentSalePrice
 
+        // For variable products WooCommerce doesn't track stock on the parent — use sum of variants
+        val parentStock = dto.stockQuantity ?: 0
+        val resolvedStock = if (parentStock == 0 && mappedVariants.isNotEmpty())
+            mappedVariants.sumOf { it.stockQty }
+        else parentStock
+        val resolvedInStock = if (mappedVariants.isNotEmpty()) resolvedStock > 0 else dto.stockStatus == "instock"
+
         return WooProduct(
             id = dto.id,
             name = dto.name,
@@ -321,8 +328,8 @@ object WooCommerceSync {
             salePrice = resolvedSalePrice,
             sku = dto.sku,
             manageStock = dto.manageStock,
-            stockQuantity = dto.stockQuantity ?: 0,
-            inStock = dto.stockStatus == "instock",
+            stockQuantity = resolvedStock,
+            inStock = resolvedInStock,
             status = dto.status,
             isFeatured = dto.featured,
             isVirtual = dto.virtual,
