@@ -36,6 +36,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
 import coil.compose.AsyncImage
 import com.sahand.wooadmin.core.utils.Helpers
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import com.sahand.wooadmin.data.WooProduct
 import com.sahand.wooadmin.ui.theme.GreenMoney
 import com.sahand.wooadmin.ui.theme.RedError
@@ -84,6 +85,11 @@ fun ProductsScreen(
 
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
         Box(modifier = Modifier.fillMaxSize()) {
+        PullToRefreshBox(
+            isRefreshing = isSyncing,
+            onRefresh = { viewModel.syncAllData() },
+            modifier = Modifier.fillMaxSize()
+        ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -515,6 +521,7 @@ fun ProductsScreen(
                 }
             }
         } // end inner Column
+        } // end PullToRefreshBox
 
         // Bulk price bottom bar
         AnimatedVisibility(

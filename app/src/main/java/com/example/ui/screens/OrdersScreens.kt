@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -52,6 +53,7 @@ fun OrdersScreen(
     val ordersList by viewModel.filteredOrders.collectAsState(initial = emptyList())
     val searchInput by viewModel.orderSearchQuery.collectAsState()
     val statusFilter by viewModel.orderStatusFilter.collectAsState()
+    val isSyncing by viewModel.isSyncing.collectAsState()
     val context = LocalContext.current
 
     var bulkMode by remember { mutableStateOf(false) }
@@ -60,6 +62,11 @@ fun OrdersScreen(
 
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
         Box(modifier = Modifier.fillMaxSize()) {
+            PullToRefreshBox(
+                isRefreshing = isSyncing,
+                onRefresh = { viewModel.syncAllData() },
+                modifier = Modifier.fillMaxSize()
+            ) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -124,81 +131,35 @@ fun OrdersScreen(
                     )
                 }
 
-                // Quick Status filter triggers
-                var showFilterDialog by remember { mutableStateOf(false) }
-                IconButton(
-                    onClick = { showFilterDialog = true },
-                    modifier = Modifier
-                        .size(52.dp)
-                        .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(12.dp))
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.FilterList,
-                        contentDescription = "فیلتر",
-                        tint = Color.White
-                    )
-                }
-
-                if (showFilterDialog) {
-                    AlertDialog(
-                        onDismissRequest = { showFilterDialog = false },
-                        title = { Text("فیلتر وضعیت سفارش") },
-                        text = {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .verticalScroll(rememberScrollState()),
-                                verticalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Button(
-                                    onClick = { viewModel.setOrderStatusFilter("ALL"); showFilterDialog = false },
-                                    modifier = Modifier.fillMaxWidth(),
-                                    colors = ButtonDefaults.buttonColors(containerColor = if (statusFilter == "ALL") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant)
-                                ) {
-                                    Text("نمایش همه", color = if (statusFilter == "ALL") Color.White else MaterialTheme.colorScheme.onSurfaceVariant)
-                                }
-
-                                OrderStatus.values().forEach { os ->
-                                    Button(
-                                        onClick = { viewModel.setOrderStatusFilter(os.name); showFilterDialog = false },
-                                        modifier = Modifier.fillMaxWidth(),
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = if (statusFilter == os.name) Color(android.graphics.Color.parseColor(os.colorHex)) else MaterialTheme.colorScheme.surfaceVariant
-                                        )
-                                    ) {
-                                        Text(os.persianLabel, color = if (statusFilter == os.name) Color.White else MaterialTheme.colorScheme.onSurfaceVariant)
-                                    }
-                                }
-                            }
-                        },
-                        confirmButton = {
-                            TextButton(onClick = { showFilterDialog = false }) { Text("بستن") }
-                        }
-                    )
-                }
             }
 
-            // Quick Info banner
-            AnimatedVisibility(visible = statusFilter != "ALL" && statusFilter != null) {
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 4.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.08f))
-                ) {
-                    Row(
-                        modifier = Modifier.padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(imageVector = Icons.Default.Info, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        val label = OrderStatus.values().find { it.name == statusFilter }?.persianLabel ?: ""
-                        Text("در حال فیلتر بر اساس: $label", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                        Spacer(modifier = Modifier.weight(1f))
-                        TextButton(onClick = { viewModel.setOrderStatusFilter("ALL") }) {
-                            Text("پاک کردن", fontSize = 11.sp)
-                        }
-                    }
+            // Status filter chips — WooCommerce style horizontal tabs
+            LazyRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(horizontal = 4.dp)
+            ) {
+                item {
+                    FilterChip(
+                        selected = statusFilter == "ALL" || statusFilter == null,
+                        onClick = { viewModel.setOrderStatusFilter("ALL") },
+                        label = { Text("همه", fontSize = 12.sp) }
+                    )
+                }
+                items(OrderStatus.values().toList()) { status ->
+                    val statusColor = Color(android.graphics.Color.parseColor(status.colorHex))
+                    FilterChip(
+                        selected = statusFilter == status.name,
+                        onClick = { viewModel.setOrderStatusFilter(status.name) },
+                        label = { Text(status.persianLabel, fontSize = 12.sp) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = statusColor.copy(alpha = 0.15f),
+                            selectedLabelColor = statusColor,
+                            selectedLeadingIconColor = statusColor
+                        )
+                    )
                 }
             }
 
@@ -249,6 +210,7 @@ fun OrdersScreen(
                 }
             }
             } // end inner Column
+            } // end PullToRefreshBox
 
             // Bulk action bottom bar
             AnimatedVisibility(

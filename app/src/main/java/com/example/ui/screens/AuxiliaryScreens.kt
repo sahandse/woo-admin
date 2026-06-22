@@ -35,6 +35,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.foundation.Canvas
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.sahand.wooadmin.core.utils.Helpers
@@ -50,6 +51,7 @@ import com.sahand.wooadmin.ui.viewmodel.WooViewModel
 // ==========================================
 // 1. MAIN SYSTEM DASHBOARD SCREEN
 // ==========================================
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardScreen(
     viewModel: WooViewModel,
@@ -63,20 +65,51 @@ fun DashboardScreen(
     val isSyncing by viewModel.isSyncing.collectAsState()
     val syncMessage by viewModel.syncMessage.collectAsState()
 
+    var selectedPeriod by remember { mutableStateOf("ALL") }
+    val todayGreg = remember {
+        val c = java.util.Calendar.getInstance()
+        String.format("%04d-%02d-%02d", c.get(java.util.Calendar.YEAR), c.get(java.util.Calendar.MONTH)+1, c.get(java.util.Calendar.DAY_OF_MONTH))
+    }
+    val weekAgoGreg = remember {
+        val c = java.util.Calendar.getInstance()
+        c.add(java.util.Calendar.DAY_OF_MONTH, -7)
+        String.format("%04d-%02d-%02d", c.get(java.util.Calendar.YEAR), c.get(java.util.Calendar.MONTH)+1, c.get(java.util.Calendar.DAY_OF_MONTH))
+    }
+    val monthGreg = remember {
+        val c = java.util.Calendar.getInstance()
+        String.format("%04d-%02d", c.get(java.util.Calendar.YEAR), c.get(java.util.Calendar.MONTH)+1)
+    }
+    val yearGreg = remember { java.util.Calendar.getInstance().get(java.util.Calendar.YEAR).toString() }
+
+    val periodOrders = remember(ordersList, selectedPeriod) {
+        when (selectedPeriod) {
+            "TODAY" -> ordersList.filter { it.createdAtJalali.startsWith(todayGreg) }
+            "WEEK" -> ordersList.filter { it.createdAtJalali >= weekAgoGreg && it.createdAtJalali <= todayGreg }
+            "MONTH" -> ordersList.filter { it.createdAtJalali.startsWith(monthGreg) }
+            "YEAR" -> ordersList.filter { it.createdAtJalali.startsWith(yearGreg) }
+            else -> ordersList
+        }
+    }
+
     val unreadNewOrders = notificationsList.filter { !it.isRead && it.type == "NEW_ORDER" }
     val lowStockProductsUnder5 = productsList.filter { it.manageStock && it.stockQuantity < 5 }
 
-    // Calculations based on seeded/synchronized order list
-    val salesToday = ordersList.sumOf { it.totalAmount }
-    val averageOrderValue = if (ordersList.isNotEmpty()) salesToday / ordersList.size else 0L
+    // Calculations based on period-filtered order list
+    val salesToday = periodOrders.sumOf { it.totalAmount }
+    val averageOrderValue = if (periodOrders.isNotEmpty()) salesToday / periodOrders.size else 0L
 
-    val processCount = ordersList.count { it.status == OrderStatus.PROCESSING.name }
-    val pendingCount = ordersList.count { it.status == OrderStatus.PENDING_PAYMENT.name }
-    val holdCount = ordersList.count { it.status == OrderStatus.ON_HOLD.name }
+    val processCount = periodOrders.count { it.status == OrderStatus.PROCESSING.name }
+    val pendingCount = periodOrders.count { it.status == OrderStatus.PENDING_PAYMENT.name }
+    val holdCount = periodOrders.count { it.status == OrderStatus.ON_HOLD.name }
     val lowStockCount = productsList.count { it.manageStock && it.stockQuantity <= it.lowStockThreshold && it.stockQuantity > 0 }
     val outOfStockCount = productsList.count { !it.inStock || it.stockQuantity <= 0 }
 
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+        PullToRefreshBox(
+            isRefreshing = isSyncing,
+            onRefresh = { viewModel.syncAllData() },
+            modifier = Modifier.fillMaxSize()
+        ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -133,6 +166,36 @@ fun DashboardScreen(
                         ) {
                             Text("تلاش مجدد", fontSize = 11.sp)
                         }
+                    }
+                }
+            }
+
+            // Period selector — WooCommerce style
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 2.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                    .padding(4.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                listOf("TODAY" to "امروز", "WEEK" to "هفته", "MONTH" to "ماه", "YEAR" to "سال", "ALL" to "همه").forEach { (key, label) ->
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (selectedPeriod == key) MaterialTheme.colorScheme.primary else Color.Transparent)
+                            .clickable { selectedPeriod = key }
+                            .padding(vertical = 8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = label,
+                            fontSize = 12.sp,
+                            fontWeight = if (selectedPeriod == key) FontWeight.Bold else FontWeight.Normal,
+                            color = if (selectedPeriod == key) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
             }
@@ -412,7 +475,13 @@ fun DashboardScreen(
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 DashboardMetricCard(
-                    title = "فروش امروز",
+                    title = when(selectedPeriod) {
+                        "TODAY" -> "درآمد امروز"
+                        "WEEK" -> "درآمد هفته"
+                        "MONTH" -> "درآمد ماه"
+                        "YEAR" -> "درآمد سال"
+                        else -> "درآمد کل"
+                    },
                     value = Helpers.formatPrice(salesToday),
                     icon = Icons.Default.TrendingUp,
                     tint = GreenMoney,
@@ -420,8 +489,8 @@ fun DashboardScreen(
                 )
 
                 DashboardMetricCard(
-                    title = "میانگین فاکتور",
-                    value = Helpers.formatPrice(averageOrderValue),
+                    title = "سفارش‌ها (${when(selectedPeriod) { "TODAY" -> "امروز"; "WEEK" -> "هفته"; "MONTH" -> "ماه"; "YEAR" -> "سال"; else -> "کل" }})",
+                    value = "${Helpers.toPersianDigits(periodOrders.size.toString())} سفارش",
                     icon = Icons.Default.AccountBalanceWallet,
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.weight(1f)
@@ -974,6 +1043,7 @@ fun DashboardScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
         }
+        } // end PullToRefreshBox
     }
 }
 
