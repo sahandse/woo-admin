@@ -1030,19 +1030,44 @@ fun ProductItemCard(
                 Spacer(modifier = Modifier.height(6.dp))
 
                 // Price display tags with percent discounts
+                // For variable products, derive effective price from variants
+                val isVariable = product.variants.isNotEmpty()
+                val effectiveRegular = if (isVariable && product.regularPrice == 0L)
+                    product.variants.minOfOrNull { it.regularPrice } ?: 0L
+                else product.regularPrice
+                val effectiveSale = if (isVariable && product.salePrice == 0L)
+                    product.variants.filter { it.salePrice > 0 }.minOfOrNull { it.salePrice } ?: 0L
+                else product.salePrice
+                val maxVariantPrice = if (isVariable) product.variants.maxOfOrNull { it.regularPrice } ?: 0L else 0L
+                val hasPriceRange = isVariable && maxVariantPrice > effectiveRegular && effectiveRegular > 0L
+
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    if (product.salePrice > 0) {
+                    if (hasPriceRange) {
+                        Column {
+                            Text(
+                                text = "از ${Helpers.formatPrice(effectiveRegular)}",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "تا ${Helpers.formatPrice(maxVariantPrice)}",
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                            )
+                        }
+                    } else if (effectiveSale > 0 && effectiveRegular > 0) {
                         Text(
-                            text = Helpers.formatPrice(product.salePrice),
+                            text = Helpers.formatPrice(effectiveSale),
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Black,
                             color = GreenMoney
                         )
                         Text(
-                            text = Helpers.formatPrice(product.regularPrice),
+                            text = Helpers.formatPrice(effectiveRegular),
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f),
                             modifier = Modifier.offset(y = 1.dp),
@@ -1050,9 +1075,7 @@ fun ProductItemCard(
                                 textDecoration = androidx.compose.ui.text.style.TextDecoration.LineThrough
                             )
                         )
-                        
-                        // Small computed discount badge
-                        val pct = ((product.regularPrice - product.salePrice).toDouble() * 100 / product.regularPrice).toInt()
+                        val pct = ((effectiveRegular - effectiveSale).toDouble() * 100 / effectiveRegular).toInt()
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(6.dp))
@@ -1068,10 +1091,11 @@ fun ProductItemCard(
                         }
                     } else {
                         Text(
-                            text = Helpers.formatPrice(product.regularPrice),
+                            text = Helpers.formatPrice(effectiveRegular),
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
+                            color = if (effectiveRegular == 0L) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                                    else MaterialTheme.colorScheme.onSurface
                         )
                     }
                 }

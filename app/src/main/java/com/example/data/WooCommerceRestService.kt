@@ -301,14 +301,24 @@ object WooCommerceSync {
             )
         }
 
+        val parentRegularPrice = dto.regularPrice.toDoubleOrNull()?.toLong() ?: 0L
+        val parentSalePrice = dto.salePrice.toDoubleOrNull()?.toLong() ?: 0L
+        // For variable products, WooCommerce leaves parent price empty — fall back to min variant price
+        val resolvedRegularPrice = if (parentRegularPrice == 0L && mappedVariants.isNotEmpty())
+            mappedVariants.minOfOrNull { it.regularPrice } ?: 0L
+        else parentRegularPrice
+        val resolvedSalePrice = if (parentSalePrice == 0L && mappedVariants.isNotEmpty())
+            mappedVariants.filter { it.salePrice > 0 }.minOfOrNull { it.salePrice } ?: 0L
+        else parentSalePrice
+
         return WooProduct(
             id = dto.id,
             name = dto.name,
             slug = dto.slug,
             shortDescription = dto.shortDescription,
             description = dto.description,
-            regularPrice = dto.regularPrice.toDoubleOrNull()?.toLong() ?: 0L,
-            salePrice = dto.salePrice.toDoubleOrNull()?.toLong() ?: 0L,
+            regularPrice = resolvedRegularPrice,
+            salePrice = resolvedSalePrice,
             sku = dto.sku,
             manageStock = dto.manageStock,
             stockQuantity = dto.stockQuantity ?: 0,
