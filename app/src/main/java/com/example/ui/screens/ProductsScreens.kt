@@ -946,34 +946,43 @@ fun ProductItemCard(
     showCheckbox: Boolean = false,
     onToggleSelect: () -> Unit = {}
 ) {
+    val isVariable = product.variants.isNotEmpty()
+    val effectiveRegular = if (isVariable && product.regularPrice == 0L)
+        product.variants.minOfOrNull { it.regularPrice } ?: 0L else product.regularPrice
+    val effectiveSale = if (isVariable && product.salePrice == 0L)
+        product.variants.filter { it.salePrice > 0 }.minOfOrNull { it.salePrice } ?: 0L else product.salePrice
+    val maxVariantPrice = if (isVariable) product.variants.maxOfOrNull { it.regularPrice } ?: 0L else 0L
+    val hasPriceRange = isVariable && maxVariantPrice > effectiveRegular && effectiveRegular > 0L
+    val effectiveStock = if (isVariable && product.stockQuantity == 0)
+        product.variants.sumOf { it.stockQty } else product.stockQuantity
+    val stockColor = if (effectiveStock == 0) RedError
+        else if (effectiveStock <= product.lowStockThreshold) YellowWarn else GreenMoney
+
     Card(
         modifier = Modifier.fillMaxWidth().clickable(enabled = showCheckbox) { onToggleSelect() },
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+            containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
                              else MaterialTheme.colorScheme.surface
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        border = if (isSelected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
-                 else BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.08f))
+        elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 0.dp else 1.dp),
+        border = if (isSelected) BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) else null
     ) {
         Row(
-            modifier = Modifier.padding(14.dp),
+            modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Bulk checkbox
             if (showCheckbox) {
                 Checkbox(checked = isSelected, onCheckedChange = { onToggleSelect() }, modifier = Modifier.size(24.dp))
                 Spacer(modifier = Modifier.width(8.dp))
             }
 
-            // Product image with elegant corner clips and thin border representation
+            // تصویر
             Box(
                 modifier = Modifier
-                    .size(88.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f), RoundedCornerShape(14.dp))
-                    .background(MaterialTheme.colorScheme.background)
+                    .size(72.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
             ) {
                 AsyncImage(
                     model = product.mainImage,
@@ -981,292 +990,125 @@ fun ProductItemCard(
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
                 )
-                
-                // Overlay for out-of-stock overlay text
-                if (product.stockQuantity == 0) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color.Black.copy(alpha = 0.4f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "اتمام موجودی",
-                            color = Color.White,
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
             }
 
-            Spacer(modifier = Modifier.width(14.dp))
+            Spacer(modifier = Modifier.width(12.dp))
 
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.Center
-            ) {
+            Column(modifier = Modifier.weight(1f)) {
+                // نام
                 Text(
                     text = product.name,
-                    fontWeight = FontWeight.ExtraBold,
+                    fontWeight = FontWeight.SemiBold,
                     fontSize = 14.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     color = MaterialTheme.colorScheme.onSurface
                 )
 
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(top = 2.dp)
-                ) {
+                if (product.sku.isNotBlank()) {
                     Text(
-                        text = "SKU: ${product.sku}",
+                        text = product.sku,
                         fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+                        modifier = Modifier.padding(top = 1.dp)
                     )
                 }
 
                 Spacer(modifier = Modifier.height(6.dp))
 
-                // Price display tags with percent discounts
-                // For variable products, derive effective price from variants
-                val isVariable = product.variants.isNotEmpty()
-                val effectiveRegular = if (isVariable && product.regularPrice == 0L)
-                    product.variants.minOfOrNull { it.regularPrice } ?: 0L
-                else product.regularPrice
-                val effectiveSale = if (isVariable && product.salePrice == 0L)
-                    product.variants.filter { it.salePrice > 0 }.minOfOrNull { it.salePrice } ?: 0L
-                else product.salePrice
-                val maxVariantPrice = if (isVariable) product.variants.maxOfOrNull { it.regularPrice } ?: 0L else 0L
-                val hasPriceRange = isVariable && maxVariantPrice > effectiveRegular && effectiveRegular > 0L
-
+                // قیمت
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    if (hasPriceRange) {
-                        Column {
+                    when {
+                        hasPriceRange -> {
                             Text(
-                                text = "از ${Helpers.formatPrice(effectiveRegular)}",
+                                text = "${Helpers.formatPrice(effectiveRegular)} — ${Helpers.formatPrice(maxVariantPrice)}",
                                 fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
+                                fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
+                        }
+                        effectiveSale > 0 && effectiveRegular > 0 -> {
+                            Text(Helpers.formatPrice(effectiveSale), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = GreenMoney)
                             Text(
-                                text = "تا ${Helpers.formatPrice(maxVariantPrice)}",
+                                Helpers.formatPrice(effectiveRegular),
                                 fontSize = 11.sp,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f),
+                                style = androidx.compose.ui.text.TextStyle(textDecoration = androidx.compose.ui.text.style.TextDecoration.LineThrough)
                             )
                         }
-                    } else if (effectiveSale > 0 && effectiveRegular > 0) {
-                        Text(
-                            text = Helpers.formatPrice(effectiveSale),
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Black,
-                            color = GreenMoney
-                        )
-                        Text(
-                            text = Helpers.formatPrice(effectiveRegular),
-                            fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f),
-                            modifier = Modifier.offset(y = 1.dp),
-                            style = androidx.compose.ui.text.TextStyle(
-                                textDecoration = androidx.compose.ui.text.style.TextDecoration.LineThrough
-                            )
-                        )
-                        val pct = ((effectiveRegular - effectiveSale).toDouble() * 100 / effectiveRegular).toInt()
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(RedError.copy(alpha = 0.1f))
-                                .padding(horizontal = 4.dp, vertical = 1.dp)
-                        ) {
-                            Text(
-                                text = "٪$pct-",
-                                color = RedError,
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    } else {
-                        Text(
-                            text = Helpers.formatPrice(effectiveRegular),
+                        else -> Text(
+                            Helpers.formatPrice(effectiveRegular),
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Bold,
-                            color = if (effectiveRegular == 0L) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                            color = if (effectiveRegular == 0L) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
                                     else MaterialTheme.colorScheme.onSurface
                         )
                     }
                 }
 
-                // Variant count + attribute chips (only for variable products)
-                if (isVariable) {
-                    Spacer(modifier = Modifier.height(5.dp))
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(5.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        // تعداد تنوع
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(MaterialTheme.colorScheme.secondaryContainer)
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                        ) {
-                            Text(
-                                text = "${Helpers.toPersianDigits(product.variants.size.toString())} تنوع",
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSecondaryContainer
-                            )
-                        }
-                    }
-                    // نام ویژگی‌ها
-                    if (product.colors.isNotEmpty() || product.sizes.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(3.dp))
-                        val attrSummary = buildString {
-                            if (product.colors.isNotEmpty()) append("${product.colorAttributeName}: ${product.colors.take(3).joinToString("، ")}${if (product.colors.size > 3) " ..." else ""}")
-                            if (product.sizes.isNotEmpty()) {
-                                if (product.colors.isNotEmpty()) append(" | ")
-                                append("${product.sizeAttributeName}: ${product.sizes.take(3).joinToString("، ")}${if (product.sizes.size > 3) " ..." else ""}")
-                            }
-                        }
+                Spacer(modifier = Modifier.height(5.dp))
+
+                // یک ردیف: وضعیت موجودی + تنوع‌ها
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Box(modifier = Modifier.size(5.dp).clip(CircleShape).background(stockColor))
+                    Text(
+                        text = buildString {
+                            append(if (effectiveStock == 0) "ناموجود" else if (effectiveStock <= product.lowStockThreshold) "رو به اتمام" else "موجود")
+                            if (effectiveStock > 0) append(" · ${Helpers.toPersianDigits(effectiveStock.toString())} عدد")
+                        },
+                        fontSize = 11.sp,
+                        color = stockColor,
+                        fontWeight = FontWeight.Medium
+                    )
+                    if (isVariable) {
+                        Text("·", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.25f))
                         Text(
-                            text = attrSummary,
-                            fontSize = 10.sp,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                            text = "${Helpers.toPersianDigits(product.variants.size.toString())} تنوع",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Stock status — for variable products use sum of variant stocks
-                val effectiveStock = if (isVariable && product.stockQuantity == 0)
-                    product.variants.sumOf { it.stockQty }
-                else product.stockQuantity
-
-                val stockColor = if (effectiveStock == 0) RedError
-                    else if (effectiveStock <= product.lowStockThreshold) YellowWarn
-                    else GreenMoney
-
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(stockColor))
-                        Text(
-                            text = if (effectiveStock == 0) "ناموجود" else if (effectiveStock <= product.lowStockThreshold) "رو به اتمام" else "موجود",
-                            color = stockColor,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.weight(1f)
-                        )
-                        if (isVariable) {
-                            // variable: فقط نمایش تعداد، بدون +/-
-                            Text(
-                                text = Helpers.toPersianDigits(effectiveStock.toString()),
-                                fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, color = stockColor,
-                                modifier = Modifier.padding(horizontal = 4.dp)
-                            )
-                        } else {
-                            // simple: کنترل +/-
-                            Box(
-                                modifier = Modifier.size(20.dp).clip(CircleShape)
-                                    .background(stockColor.copy(alpha = 0.12f))
-                                    .clickable { onDecrementStock() },
-                                contentAlignment = Alignment.Center
-                            ) { Icon(Icons.Default.Remove, null, modifier = Modifier.size(12.dp), tint = stockColor) }
-                            Text(
-                                text = Helpers.toPersianDigits(effectiveStock.toString()),
-                                fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, color = stockColor,
-                                modifier = Modifier.padding(horizontal = 4.dp)
-                            )
-                            Box(
-                                modifier = Modifier.size(20.dp).clip(CircleShape)
-                                    .background(stockColor.copy(alpha = 0.12f))
-                                    .clickable { onIncrementStock() },
-                                contentAlignment = Alignment.Center
-                            ) { Icon(Icons.Default.Add, null, modifier = Modifier.size(12.dp), tint = stockColor) }
+                // ویژگی‌ها (فقط اگر variable)
+                if (isVariable && (product.colors.isNotEmpty() || product.sizes.isNotEmpty())) {
+                    val attrSummary = buildString {
+                        if (product.colors.isNotEmpty()) append(product.colors.take(3).joinToString("، ") + if (product.colors.size > 3) " ..." else "")
+                        if (product.sizes.isNotEmpty()) {
+                            if (product.colors.isNotEmpty()) append(" | ")
+                            append(product.sizes.take(3).joinToString("، ") + if (product.sizes.size > 3) " ..." else "")
                         }
                     }
-
-                    Spacer(modifier = Modifier.height(4.dp))
-                    val progressFraction = if (effectiveStock == 0) 0f
-                        else if (effectiveStock <= product.lowStockThreshold) 0.35f else 1.0f
-                    LinearProgressIndicator(
-                        progress = { progressFraction },
-                        modifier = Modifier.fillMaxWidth(0.9f).height(3.dp).clip(RoundedCornerShape(2.dp)),
-                        color = stockColor, trackColor = stockColor.copy(alpha = 0.12f)
+                    Text(
+                        text = attrSummary,
+                        fontSize = 10.sp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 2.dp)
                     )
                 }
             }
 
-            // Quick Operations Column (Pricing, Stock-adjust, and Detailed Editing)
+            // دکمه‌های سریع — ساده و بدون background
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-                modifier = Modifier
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f))
-                    .padding(horizontal = 4.dp, vertical = 6.dp)
+                verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
-                // Price adjustment quick button
-                IconButton(
-                    onClick = onPriceChange,
-                    modifier = Modifier.size(34.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.AttachMoney,
-                        contentDescription = "ویرایش سریع قیمت",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp)
-                    )
+                IconButton(onClick = onPriceChange, modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.Default.AttachMoney, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
                 }
-
-                // Inventory adjustment quick button
-                IconButton(
-                    onClick = onStockChange,
-                    modifier = Modifier.size(34.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Inventory,
-                        contentDescription = "ویرایش سریع انبار",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(19.dp)
-                    )
+                IconButton(onClick = onStockChange, modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.Default.Inventory, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(17.dp))
                 }
-
-                // Clone product
-                IconButton(
-                    onClick = onClone,
-                    modifier = Modifier.size(34.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.ContentCopy,
-                        contentDescription = "کپی محصول",
-                        tint = GreenMoney,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-
-                // Complete full-form edit
-                IconButton(
-                    onClick = onEdit,
-                    modifier = Modifier.size(34.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Edit,
-                        contentDescription = "ویرایش کامل مشخصات",
-                        tint = MaterialTheme.colorScheme.secondary,
-                        modifier = Modifier.size(19.dp)
-                    )
+                IconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
+                    Icon(Icons.Default.Edit, null, tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f), modifier = Modifier.size(17.dp))
                 }
             }
         }

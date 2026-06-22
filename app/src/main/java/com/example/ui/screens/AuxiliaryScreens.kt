@@ -170,32 +170,39 @@ fun DashboardScreen(
                 }
             }
 
-            // Period selector — WooCommerce style
+            // Period selector — minimal tab style
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 2.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                    .padding(4.dp),
+                    .padding(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
                 listOf("TODAY" to "امروز", "WEEK" to "هفته", "MONTH" to "ماه", "YEAR" to "سال", "ALL" to "همه").forEach { (key, label) ->
-                    Box(
+                    val selected = selectedPeriod == key
+                    Column(
                         modifier = Modifier
                             .weight(1f)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(if (selectedPeriod == key) MaterialTheme.colorScheme.primary else Color.Transparent)
                             .clickable { selectedPeriod = key }
                             .padding(vertical = 8.dp),
-                        contentAlignment = Alignment.Center
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
                             text = label,
                             fontSize = 12.sp,
-                            fontWeight = if (selectedPeriod == key) FontWeight.Bold else FontWeight.Normal,
-                            color = if (selectedPeriod == key) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                            color = if (selected) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
                         )
+                        if (selected) {
+                            Spacer(modifier = Modifier.height(3.dp))
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth(0.5f)
+                                    .height(2.dp)
+                                    .clip(RoundedCornerShape(1.dp))
+                                    .background(MaterialTheme.colorScheme.primary)
+                            )
+                        }
                     }
                 }
             }
