@@ -28,6 +28,8 @@
 # Keep OkHttp logging
 -dontwarn okhttp3.**
 -dontwarn okio.**
+-dontwarn com.google.errorprone.annotations.**
+-dontwarn com.google.crypto.tink.**
 
 # General Android
 -keepattributes SourceFile,LineNumberTable
