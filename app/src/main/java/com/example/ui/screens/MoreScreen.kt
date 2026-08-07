@@ -1,3 +1,4 @@
+import android.widget.Toast
 package com.example.ui.screens
 
 import androidx.compose.foundation.background
@@ -279,7 +280,7 @@ fun QuickActionCard(
 ) {
     Card(
         modifier = Modifier
-            .weight(1f)
+            .fillMaxWidth()
             .clickable { onClick() },
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         shape = RoundedCornerShape(16.dp),

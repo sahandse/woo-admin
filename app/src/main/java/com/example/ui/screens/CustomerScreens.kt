@@ -34,6 +34,9 @@ import com.example.data.WooCustomer
 import com.example.ui.theme.GreenMoney
 import com.example.ui.viewmodel.WooViewModel
 import kotlinx.coroutines.launch
+import androidx.compose.ui.unit.Dp
+import androidx.compose.foundation.border
+import androidx.compose.foundation.horizontalScroll
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -332,7 +335,7 @@ fun CustomerDetailsScreen(
                 ) {
                     Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text("خلاصه خریدهای انجام‌شده", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                        Divider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05.dp))
+                        Divider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f))
 
                         StatisticRow("تعداد کل فاکتورها", "${Helpers.toPersianDigits(customer.ordersCount)} بار ثبت خرید")
                         StatisticRow("مجموع کل پرداخت به سایت", Helpers.formatPrice(customer.totalSpent))
@@ -350,7 +353,7 @@ fun CustomerDetailsScreen(
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(customer.billingAddress, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f))
 
-                        Divider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05.dp))
+                        Divider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f))
 
                         Text("نشانی محل سکونت/تحویل:", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                         Spacer(modifier = Modifier.height(8.dp))
