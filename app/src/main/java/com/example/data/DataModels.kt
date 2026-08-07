@@ -200,7 +200,117 @@ data class AdminActivity(
     val timestampJalali: String
 )
 
-// --- TYPE CONVERTERS FOR COMPLEX PROPERTIES ---
+// --- CONVERSION EXTENSIONS ---
+// Convert WooCommerce API models to local Room models
+fun WcOrder.toLocal(): WooOrder {
+    val items = this.line_items.map { item ->
+        OrderItem(
+            productId = item.product_id,
+            productName = item.name,
+            quantity = item.quantity,
+            unitPrice = item.total.replace("[^\\d]".toRegex(), "").toLongOrNull() ?: 0L,
+            totalPrice = item.total.replace("[^\\d]".toRegex(), "").toLongOrNull() ?: 0L,
+            image = item.image?.src ?: ""
+        )
+    }
+
+    val trackingMeta = this.meta_data?.find { it.key == "_tracking_code" }
+    val shippingCompanyMeta = this.meta_data?.find { it.key == "_shipping_company" }
+    val shippingStatusMeta = this.meta_data?.find { it.key == "_shipping_status" }
+    val adminNotesMeta = this.meta_data?.find { it.key == "_admin_notes" }
+
+    return WooOrder(
+        id = this.id,
+        orderNumber = this.order_number ?: "#${this.id}",
+        status = this.status.uppercase(),
+        createdAtJalali = this.date_created_jalali ?: this.date_created?.substringBefore("T") ?: "",
+        createdAtTime = this.date_created?.substringAfter("T")?.substring(0, 8) ?: "",
+        customerName = "${this.billing.first_name} ${this.billing.last_name}",
+        customerPhone = this.billing.phone,
+        customerEmail = this.billing.email,
+        billingAddress = this.billing.address_1,
+        shippingAddress = this.shipping.address_1,
+        city = this.billing.city,
+        province = this.billing.state,
+        postalCode = "",
+        customerNote = this.customer_note ?: "",
+        items = items,
+        subtotal = this.subtotal?.replace("[^\\d]".toRegex(), "")?.toLongOrNull() ?: 0L,
+        discount = this.discount_total?.replace("[^\\d]".toRegex(), "")?.toLongOrNull() ?: 0L,
+        shippingCost = this.shipping_total?.replace("[^\\d]".toRegex(), "")?.toLongOrNull() ?: 0L,
+        totalAmount = this.total.replace("[^\\d]".toRegex(), "").toLongOrNull() ?: 0L,
+        paymentMethod = this.payment_method ?: "",
+        isPaid = this.status in listOf("processing", "completed"),
+        trackingCode = trackingMeta?.value ?: "",
+        shippingCompany = shippingCompanyMeta?.value ?: "",
+        shippingStatus = shippingStatusMeta?.value ?: "READY_TO_PACK",
+        adminNotes = adminNotesMeta?.value ?: ""
+    )
+}
+
+fun WcProduct.toLocal(): WooProduct {
+    val categoryList = this.categories.map { it.name }
+    val imageList = this.images.map { it.src }
+
+    return WooProduct(
+        id = this.id,
+        name = this.name,
+        slug = this.slug,
+        shortDescription = this.short_description,
+        description = this.description,
+        regularPrice = this.regular_price.replace("[^\\d]".toRegex(), "").toLongOrNull() ?: 0L,
+        salePrice = this.sale_price.replace("[^\\d]".toRegex(), "").toLongOrNull() ?: 0L,
+        isPromoActive = this.sale_price.isNotBlank() && this.sale_price != "0",
+        sku = this.sku,
+        manageStock = this.manage_stock,
+        stockQuantity = this.stock_quantity,
+        inStock = this.in_stock,
+        lowStockThreshold = 5,
+        weight = this.weight?.replace("[^\\d.]".toRegex(), "")?.toDoubleOrNull() ?: 0.0,
+        length = this.dimensions?.length?.replace("[^\\d.]".toRegex(), "")?.toDoubleOrNull() ?: 0.0,
+        width = this.dimensions?.width?.replace("[^\\d.]".toRegex(), "")?.toDoubleOrNull() ?: 0.0,
+        height = this.dimensions?.height?.replace("[^\\d.]".toRegex(), "")?.toDoubleOrNull() ?: 0.0,
+        categories = categoryList.joinToString(", "),
+        tags = "",
+        mainImage = imageList.firstOrNull() ?: "",
+        galleryImages = imageList,
+        isFeatured = this.featured,
+        status = this.status,
+        warehouseNote = ""
+    )
+}
+
+fun WcCustomer.toLocal(): WooCustomer {
+    return WooCustomer(
+        id = this.id,
+        firstName = this.first_name,
+        lastName = this.last_name,
+        phone = this.billing.phone,
+        email = this.email,
+        registeredDateJalali = "", // WooCommerce doesn't return Jalali, handled in UI
+        ordersCount = 0,
+        totalSpent = 0L,
+        lastPurchaseDateJalali = "",
+        averageOrderValue = 0L,
+        billingAddress = this.billing.address_1,
+        shippingAddress = this.shipping.address_1,
+        category = "REGULAR"
+    )
+}
+
+fun WcCoupon.toLocal(): WooCoupon {
+    return WooCoupon(
+        id = this.id,
+        code = this.code,
+        discountType = this.discount_type,
+        amount = this.amount.replace("[^\\d]".toRegex(), "").toLongOrNull() ?: 0L,
+        expiryJalali = this.date_expires?.substringBefore("T") ?: "",
+        usageLimit = 0,
+        usageLimitPerUser = 0,
+        usedCount = this.usage_count,
+        active = this.status == "publish"
+    )
+}
 class RoomTypeConverters {
     private val moshi = Moshi.Builder().build()
 

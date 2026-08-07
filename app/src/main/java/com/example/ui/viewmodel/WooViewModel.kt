@@ -4,7 +4,6 @@ import android.app.Application
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.core.network.GeminiManager
 import com.example.core.utils.Helpers
 import com.example.core.utils.JalaliCalendar
 import com.example.data.*
@@ -73,13 +72,6 @@ class WooViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _loginError = MutableStateFlow<String?>(null)
     val loginError: StateFlow<String?> = _loginError.asStateFlow()
-
-    // --- GEMINI AI STATES ---
-    private val _aiResult = MutableStateFlow<String?>(null)
-    val aiResult: StateFlow<String?> = _aiResult.asStateFlow()
-
-    private val _isAiLoading = MutableStateFlow(false)
-    val isAiLoading: StateFlow<Boolean> = _isAiLoading.asStateFlow()
 
     init {
         viewModelScope.launch(Dispatchers.IO) {
@@ -527,36 +519,6 @@ class WooViewModel(application: Application) : AndroidViewModel(application) {
                 onSuccess()
             } catch (e: Exception) {
                 onError("خطا در برقراری ارتباط با وبسایت: ${e.localizedMessage}")
-            }
-        }
-    }
-
-    // --- SMART AI ANALYSIS WITH GEMINI API ---
-    fun runAiAnalysis(prompt: String) {
-        viewModelScope.launch {
-            _isAiLoading.value = true
-            _aiResult.value = null
-            try {
-                // Enrich prompt with store data if needed
-                val ordersList = orders.value
-                val lowStockList = products.value.filter { it.manageStock && it.stockQuantity <= it.lowStockThreshold }
-                
-                val contextPrompt = """
-                    آمار فروشگاه فعلی:
-                    تعداد کل سفارش‌ها: ${ordersList.size}
-                    جمع کل مبلغ فروش: ${Helpers.formatPrice(ordersList.sumOf { it.totalAmount })}
-                    تعداد کالاهای رو به اتمام (کم‌موجودی): ${lowStockList.size} (${lowStockList.joinToString { it.name }})
-                    
-                    درخواست مدیر فروشگاه:
-                    $prompt
-                """.trimIndent()
-
-                val response = GeminiManager.generateAnalysis(contextPrompt)
-                _aiResult.value = response
-            } catch (e: Exception) {
-                _aiResult.value = "خطا در برقراری ارتباط با مدل هوش مصنوعی: ${e.localizedMessage}"
-            } finally {
-                _isAiLoading.value = false
             }
         }
     }
