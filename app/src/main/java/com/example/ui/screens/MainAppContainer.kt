@@ -75,8 +75,7 @@ fun MainAppContainer(
                             activeScreen is Screen.Orders ||
                             activeScreen is Screen.Products ||
                             activeScreen is Screen.Customers ||
-                            activeScreen is Screen.AiAnalyst ||
-                            activeScreen is Screen.Settings
+                            activeScreen is Screen.More
 
                 if (isTab) {
                     TopAppBar(
@@ -258,18 +257,7 @@ fun MainAppContainer(
                     is Screen.More -> {
                         MoreScreen(
                             viewModel = viewModel,
-                            onNavigateToSettings = { activeScreen = Screen.Settings },
-                            onNavigateToActivities = { activeScreen = Screen.Activities },
-                            onNavigateToCoupons = { activeScreen = Screen.Coupons },
-                            onToggleDarkTheme = onToggleDarkTheme,
-                            isDarkTheme = isDarkTheme
-                        )
-                    }
-
-                    is Screen.Settings -> {
-                        SettingsScreen(
-                            viewModel = viewModel,
-                            onBack = { activeScreen = Screen.More },
+                            onNavigateToSettings = { activeScreen = Screen.More },
                             onNavigateToActivities = { activeScreen = Screen.Activities },
                             onNavigateToCoupons = { activeScreen = Screen.Coupons },
                             onToggleDarkTheme = onToggleDarkTheme,
@@ -278,11 +266,11 @@ fun MainAppContainer(
                     }
 
                     is Screen.Activities -> {
-                        AdminActivitiesScreen(viewModel = viewModel, onBack = { activeScreen = Screen.Settings })
+                        AdminActivitiesScreen(viewModel = viewModel, onBack = { activeScreen = Screen.More })
                     }
 
                     is Screen.Coupons -> {
-                        CouponsScreen(viewModel = viewModel, onBack = { activeScreen = Screen.Settings })
+                        CouponsScreen(viewModel = viewModel, onBack = { activeScreen = Screen.More })
                     }
                 }
             }
