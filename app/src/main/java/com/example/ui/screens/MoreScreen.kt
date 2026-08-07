@@ -41,7 +41,6 @@ fun MoreScreen(
     val storesList by viewModel.stores.collectAsState(initial = emptyList())
     val activeStore = storesList.find { it.isActive }
 
-    var demoModeEnabled by remember { mutableStateOf(viewModel.repository.isDemoMode) }
     var showSyncDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -183,20 +182,6 @@ fun MoreScreen(
                                 )
                             }
                         )
-                        Divider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f))
-                        SettingsRow(
-                            icon = Icons.Default.Science,
-                            label = "حالت آزمایشی (Demo)",
-                            trailing = {
-                                Switch(
-                                    checked = demoModeEnabled,
-                                    onCheckedChange = {
-                                        demoModeEnabled = it
-                                        viewModel.repository.isDemoMode = it
-                                    }
-                                )
-                            }
-                        )
                     }
                 }
             }
@@ -238,28 +223,21 @@ fun MoreScreen(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text("همه داده‌های سفارشات، محصولات، مشتریان و کوپن‌ها با سرور ووکامرس به‌روز می‌شود.")
-                    if (demoModeEnabled) {
-                        Text(
-                            text = "هشدار: در حالت آزمایشی، همگام‌سازی غیرفعال است.",
-                            color = YellowWarn,
-                            fontSize = 12.sp
-                        )
-                    }
+
                 }
             },
             confirmButton = {
-                Button(
-                    onClick = {
-                        showSyncDialog = false
-                        scope.launch {
-                            viewModel.repository.syncAllData()
-                            Toast.makeText(context, "همگام‌سازی با موفقیت انجام شد", Toast.LENGTH_SHORT).show()
+                    Button(
+                        onClick = {
+                            showSyncDialog = false
+                            scope.launch {
+                                viewModel.repository.syncAllData()
+                                Toast.makeText(context, "همگام‌سازی با موفقیت انجام شد", Toast.LENGTH_SHORT).show()
+                            }
                         }
-                    },
-                    enabled = !demoModeEnabled
-                ) {
-                    Text("شروع همگام‌سازی")
-                }
+                    ) {
+                        Text("شروع همگام‌سازی")
+                    }
             },
             dismissButton = {
                 TextButton(onClick = { showSyncDialog = false }) {

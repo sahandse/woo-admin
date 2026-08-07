@@ -42,7 +42,6 @@ fun SettingsScreen(
     val storesList by viewModel.stores.collectAsState(initial = emptyList())
     val activeStore = storesList.find { it.isActive }
     
-    var demoModeEnabled by remember { mutableStateOf(viewModel.repository.isDemoMode) }
     var backendUrlInput by remember { mutableStateOf(viewModel.repository.backendUrl) }
     
     var showAddStoreDialog by remember { mutableStateOf(false) }
@@ -142,34 +141,10 @@ fun SettingsScreen(
 
             // Connection Profile Settings
             SettingCategory("تنظیمات اتصال وبسایت") {
-                // Demo Mode Switch
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("حالت آزمایشی آفلاین (Demo)", fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                        Text("مشاهده، ویرایش و تحلیل سریع بدون نیاز به داشتن اینترنت یا سرور بکاند", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
-                    }
-                    Switch(
-                        checked = demoModeEnabled,
-                        onCheckedChange = {
-                            demoModeEnabled = it
-                            viewModel.repository.isDemoMode = it
-                            Toast.makeText(context, if (it) "سرور شبیه‌سازی محلی فعال شد" else "اتصال وب سرویس ووکامرس فعال شد", Toast.LENGTH_SHORT).show()
-                        },
-                        modifier = Modifier.testTag("demo_mode_toggle")
-                    )
-                }
+                Divider(modifier = Modifier.padding(vertical = 12.dp))
 
-                if (!demoModeEnabled) {
-                    Divider(modifier = Modifier.padding(vertical = 12.dp))
-
-                    Text("نشانی سرور بکاند اختصاصی", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    Spacer(modifier = Modifier.height(6.dp))
+                Text("نشانی سرور بکاند اختصاصی", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                Spacer(modifier = Modifier.height(6.dp))
 
                     OutlinedTextField(
                         value = backendUrlInput,
