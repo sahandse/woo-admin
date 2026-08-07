@@ -717,25 +717,6 @@ fun ProductsScreen(
 }
 
 @Composable
-fun FilterTabItem(label: String, selected: Boolean, onClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(10.dp))
-            .background(if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface)
-            .border(1.dp, if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.2f), RoundedCornerShape(10.dp))
-            .clickable { onClick() }
-            .padding(horizontal = 14.dp, vertical = 8.dp)
-    ) {
-        Text(
-            text = label,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = if (selected) Color.White else MaterialTheme.colorScheme.onSurface
-        )
-    }
-}
-
-@Composable
 fun ProductItemCard(
     product: WooProduct,
     onEdit: () -> Unit,
