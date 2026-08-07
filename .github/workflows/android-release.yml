@@ -35,6 +35,21 @@ jobs:
         run: |
           echo "${{ secrets.ENV_FILE }}" > .env
           
+      - name: Generate debug keystore if release keystore is missing
+        run: |
+          if [ ! -f my-upload-key.jks ]; then
+            echo "Release keystore not found, generating debug keystore for CI..."
+            keytool -genkeypair -v \
+              -keystore my-upload-key.jks \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -alias upload \
+              -storepass android \
+              -keypass android \
+              -dname "CN=CI, OU=Build, O=GitHub Actions, L=Unknown, S=Unknown, C=US"
+          fi
+          
       - name: Build Release APK
         run: gradle assembleRelease
         env:
