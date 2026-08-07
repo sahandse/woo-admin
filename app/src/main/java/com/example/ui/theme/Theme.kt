@@ -6,32 +6,38 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 
-private val DarkColorScheme = darkColorScheme(
-    primary = AdminBluePrimaryDark,
-    secondary = AdminBlueSecondaryDark,
-    tertiary = AdminTealDark,
-    background = AdminBackgroundDark,
-    surface = AdminSurfaceDark,
-    onPrimary = AdminBackgroundDark,
-    onSecondary = AdminBackgroundDark,
-    onTertiary = AdminBackgroundDark,
-    onBackground = AdminTextPrimaryDark,
-    onSurface = AdminTextPrimaryDark,
-    error = RedError
+private val LightColorScheme = lightColorScheme(
+    primary = WooPurple,
+    onPrimary = Color.White,
+    primaryContainer = WooPurple.copy(alpha = 0.1f),
+    secondary = WooBlue,
+    onSecondary = Color.White,
+    tertiary = WooGreen,
+    background = LightBackground,
+    surface = LightSurface,
+    surfaceVariant = LightSurfaceVariant,
+    onBackground = LightTextPrimary,
+    onSurface = LightTextPrimary,
+    onSurfaceVariant = LightTextSecondary,
+    outline = LightBorder,
+    error = WooRed
 )
 
-private val LightColorScheme = lightColorScheme(
-    primary = AdminBluePrimary,
-    secondary = AdminBlueSecondary,
-    tertiary = AdminTeal,
-    background = AdminBackgroundLight,
-    surface = AdminSurfaceLight,
-    onPrimary = AdminSurfaceLight,
-    onSecondary = AdminSurfaceLight,
-    onTertiary = AdminSurfaceLight,
-    onBackground = AdminTextPrimaryLight,
-    onSurface = AdminTextPrimaryLight,
-    error = RedError
+private val DarkColorScheme = darkColorScheme(
+    primary = WooPurple,
+    onPrimary = Color.White,
+    primaryContainer = WooPurple.copy(alpha = 0.15f),
+    secondary = WooBlue,
+    onSecondary = Color.Black,
+    tertiary = WooGreen,
+    background = DarkBackground,
+    surface = DarkSurface,
+    surfaceVariant = DarkSurfaceVariant,
+    onBackground = DarkTextPrimary,
+    onSurface = DarkTextPrimary,
+    onSurfaceVariant = DarkTextSecondary,
+    outline = DarkBorder,
+    error = WooRed
 )
 
 @Composable

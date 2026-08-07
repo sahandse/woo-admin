@@ -2,25 +2,44 @@ package com.example.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// --- LIGHT WORKSPACE BLUE THEME ---
-val AdminBluePrimary = Color(0xFF1E40AF) // Trustworthy Cobalt
-val AdminBlueSecondary = Color(0xFF3B82F6) // Accent Sapphire
-val AdminTeal = Color(0xFF0F766E) // Administrative Greenish-Teal
-val AdminBackgroundLight = Color(0xFFF1F5F9) // Slate White background
-val AdminSurfaceLight = Color(0xFFFFFFFF) // White cards
-val AdminTextPrimaryLight = Color(0xFF0F172A) // Dark slate text
-val AdminTextSecondaryLight = Color(0xFF475569) // Lighter slate
+// WooCommerce-inspired minimal palette
+val WooPurple = Color(0xFF7F54B3)
+val WooPurpleDark = Color(0xFF5E3A8C)
+val WooGreen = Color(0xFF10B981)
+val WooRed = Color(0xFFEF4444)
+val WooYellow = Color(0xFFF59E0B)
+val WooBlue = Color(0xFF3B82F6)
 
-// --- DARK REGAL THEME ---
-val AdminBluePrimaryDark = Color(0xFF60A5FA) // Lighter blue accent
-val AdminBlueSecondaryDark = Color(0xFF93C5FD)
-val AdminTealDark = Color(0xFF2DD4BF)
-val AdminBackgroundDark = Color(0xFF0F172A) // Rich Charcoal-Blue slate
-val AdminSurfaceDark = Color(0xFF1E293B) // Layered gray-blue cards
-val AdminTextPrimaryDark = Color(0xFFF8FAFC) // Ice white
-val AdminTextSecondaryDark = Color(0xFF94A3B8) // Pale slate
+val LightBackground = Color(0xFFFAFAFA)
+val LightSurface = Color(0xFFFFFFFF)
+val LightSurfaceVariant = Color(0xFFF5F5F5)
+val LightTextPrimary = Color(0xFF1A1A1A)
+val LightTextSecondary = Color(0xFF6B7280)
+val LightBorder = Color(0xFFE5E7EB)
 
-// --- SPECIFICS ---
-val GreenMoney = Color(0xFF10B981) // Success
-val RedError = Color(0xFFEF4444) // Danger
-val YellowWarn = Color(0xFFF59E0B) // Alert
+val DarkBackground = Color(0xFF0F0F0F)
+val DarkSurface = Color(0xFF1A1A1A)
+val DarkSurfaceVariant = Color(0xFF242424)
+val DarkTextPrimary = Color(0xFFF5F5F5)
+val DarkTextSecondary = Color(0xFF9CA3AF)
+val DarkBorder = Color(0xFF2D2D2D)
+
+// Legacy aliases for backward compatibility
+val AdminBluePrimary = WooPurple
+val AdminBlueSecondary = WooBlue
+val AdminTeal = WooGreen
+val AdminBackgroundLight = LightBackground
+val AdminSurfaceLight = LightSurface
+val AdminTextPrimaryLight = LightTextPrimary
+val AdminTextSecondaryLight = LightTextSecondary
+val AdminBluePrimaryDark = WooPurple
+val AdminBlueSecondaryDark = WooBlue
+val AdminTealDark = WooGreen
+val AdminBackgroundDark = DarkBackground
+val AdminSurfaceDark = DarkSurface
+val AdminTextPrimaryDark = DarkTextPrimary
+val AdminTextSecondaryDark = DarkTextSecondary
+
+val GreenMoney = WooGreen
+val RedError = WooRed
+val YellowWarn = WooYellow

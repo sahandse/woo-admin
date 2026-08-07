@@ -8,6 +8,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.withContext
+import okhttp3.Credentials
 
 class WooRepository(private val db: AppDatabase, private val context: Context) {
 
@@ -150,6 +151,73 @@ class WooRepository(private val db: AppDatabase, private val context: Context) {
     fun getAllActivities(): Flow<List<AdminActivity>> = db.adminActivityDao().getAllActivities()
 
     fun getAllStores(): Flow<List<WooStore>> = db.storeDao().getAllStores()
+
+    // --- REMOTE SYNC ---
+    private val authenticator = WooCommerceAuthenticator(context)
+
+    suspend fun syncAllData() = withContext(Dispatchers.IO) {
+        if (!authenticator.isLoggedIn() || isDemoMode) return@withContext
+
+        try {
+            val credential = Credentials.basic(authenticator.consumerKey, authenticator.consumerSecret)
+            val baseUrl = authenticator.storeUrl.trimEnd('/')
+
+            // Sync orders
+            val ordersResponse = RetrofitInstance.wooCommerceApi.getOrders(credential)
+            val localOrders = ordersResponse.map { it.toLocal() }
+            db.orderDao().clearAllOrders()
+            db.orderDao().insertOrders(localOrders)
+
+            // Sync products
+            val productsResponse = RetrofitInstance.wooCommerceApi.getProducts(credential)
+            val localProducts = productsResponse.map { it.toLocal() }
+            db.productDao().clearAllProducts()
+            db.productDao().insertProducts(localProducts)
+
+            // Sync customers
+            val customersResponse = RetrofitInstance.wooCommerceApi.getCustomers(credential)
+            val localCustomers = customersResponse.map { it.toLocal() }
+            db.customerDao().clearAllCustomers()
+            db.customerDao().insertCustomers(localCustomers)
+
+            // Sync coupons
+            val couponsResponse = RetrofitInstance.wooCommerceApi.getCoupons(credential)
+            val localCoupons = couponsResponse.map { it.toLocal() }
+            db.couponDao().clearAllCoupons()
+            db.couponDao().insertCoupons(localCoupons)
+
+            logActivity("SYNC", "همگام‌سازی کامل با سرور ووکامرس انجام شد.")
+        } catch (e: Exception) {
+            Log.e("WooRepository", "Sync failed", e)
+            logActivity("SYNC_ERROR", "خطا در همگام‌سازی: ${e.localizedMessage}")
+        }
+    }
+
+    suspend fun syncOrders() = withContext(Dispatchers.IO) {
+        if (!authenticator.isLoggedIn() || isDemoMode) return@withContext
+        try {
+            val credential = Credentials.basic(authenticator.consumerKey, authenticator.consumerSecret)
+            val ordersResponse = RetrofitInstance.wooCommerceApi.getOrders(credential)
+            val localOrders = ordersResponse.map { it.toLocal() }
+            db.orderDao().clearAllOrders()
+            db.orderDao().insertOrders(localOrders)
+        } catch (e: Exception) {
+            Log.e("WooRepository", "Orders sync failed", e)
+        }
+    }
+
+    suspend fun syncProducts() = withContext(Dispatchers.IO) {
+        if (!authenticator.isLoggedIn() || isDemoMode) return@withContext
+        try {
+            val credential = Credentials.basic(authenticator.consumerKey, authenticator.consumerSecret)
+            val productsResponse = RetrofitInstance.wooCommerceApi.getProducts(credential)
+            val localProducts = productsResponse.map { it.toLocal() }
+            db.productDao().clearAllProducts()
+            db.productDao().insertProducts(localProducts)
+        } catch (e: Exception) {
+            Log.e("WooRepository", "Products sync failed", e)
+        }
+    }
 
     // --- WRITE ACTIONS & TRANSACTIONS ---
     suspend fun changeOrderStatus(orderId: Long, status: OrderStatus) = withContext(Dispatchers.IO) {

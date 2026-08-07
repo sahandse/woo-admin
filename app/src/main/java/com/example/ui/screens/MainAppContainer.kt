@@ -35,8 +35,7 @@ sealed class Screen {
     object Orders : Screen()
     object Products : Screen()
     object Customers : Screen()
-    object AiAnalyst : Screen()
-    object Settings : Screen()
+    object More : Screen() // Settings + extras
     data class OrderDetails(val orderId: Long) : Screen()
     data class AddEditProduct(val productId: Long?) : Screen()
     data class CustomerDetails(val customerId: Long) : Screen()
@@ -76,8 +75,7 @@ fun MainAppContainer(
                             activeScreen is Screen.Orders ||
                             activeScreen is Screen.Products ||
                             activeScreen is Screen.Customers ||
-                            activeScreen is Screen.AiAnalyst ||
-                            activeScreen is Screen.Settings
+                            activeScreen is Screen.More
 
                 if (isTab) {
                     TopAppBar(
@@ -142,8 +140,7 @@ fun MainAppContainer(
                             activeScreen is Screen.Orders ||
                             activeScreen is Screen.Products ||
                             activeScreen is Screen.Customers ||
-                            activeScreen is Screen.AiAnalyst ||
-                            activeScreen is Screen.Settings
+                            activeScreen is Screen.More
 
                 if (isTab) {
                     NavigationBar(
@@ -179,17 +176,10 @@ fun MainAppContainer(
                         )
 
                         NavigationBarItem(
-                            selected = activeScreen is Screen.AiAnalyst,
-                            onClick = { activeScreen = Screen.AiAnalyst },
-                            icon = { Icon(imageVector = Icons.Default.AutoAwesome, contentDescription = "هوش مصنوعی") },
-                            label = { Text("هوشمند", fontSize = 10.sp, fontWeight = FontWeight.Bold) }
-                        )
-
-                        NavigationBarItem(
-                            selected = activeScreen is Screen.Settings,
-                            onClick = { activeScreen = Screen.Settings },
-                            icon = { Icon(imageVector = Icons.Default.Settings, contentDescription = "تنظیمات") },
-                            label = { Text("تنظیمات", fontSize = 10.sp, fontWeight = FontWeight.Bold) }
+                            selected = activeScreen is Screen.More,
+                            onClick = { activeScreen = Screen.More },
+                            icon = { Icon(imageVector = Icons.Default.MoreVert, contentDescription = "بیشتر") },
+                            label = { Text("بیشتر", fontSize = 10.sp, fontWeight = FontWeight.Bold) }
                         )
                     }
                 }
@@ -264,13 +254,10 @@ fun MainAppContainer(
                         )
                     }
 
-                    is Screen.AiAnalyst -> {
-                        AiAnalystScreen(viewModel = viewModel)
-                    }
-
-                    is Screen.Settings -> {
-                        SettingsScreen(
+                    is Screen.More -> {
+                        MoreScreen(
                             viewModel = viewModel,
+                            onNavigateToSettings = { activeScreen = Screen.More },
                             onNavigateToActivities = { activeScreen = Screen.Activities },
                             onNavigateToCoupons = { activeScreen = Screen.Coupons },
                             onToggleDarkTheme = onToggleDarkTheme,
@@ -279,11 +266,11 @@ fun MainAppContainer(
                     }
 
                     is Screen.Activities -> {
-                        AdminActivitiesScreen(viewModel = viewModel, onBack = { activeScreen = Screen.Settings })
+                        AdminActivitiesScreen(viewModel = viewModel, onBack = { activeScreen = Screen.More })
                     }
 
                     is Screen.Coupons -> {
-                        CouponsScreen(viewModel = viewModel, onBack = { activeScreen = Screen.Settings })
+                        CouponsScreen(viewModel = viewModel, onBack = { activeScreen = Screen.More })
                     }
                 }
             }

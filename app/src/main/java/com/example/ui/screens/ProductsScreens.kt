@@ -744,25 +744,19 @@ fun ProductItemCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
+        shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        border = BorderStroke(
-            width = 1.dp,
-            color = MaterialTheme.colorScheme.outline.copy(alpha = 0.08f)
-        )
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Row(
-            modifier = Modifier.padding(14.dp),
+            modifier = Modifier.padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Product image with elegant corner clips and thin border representation
             Box(
                 modifier = Modifier
-                    .size(88.dp)
-                    .clip(RoundedCornerShape(14.dp))
-                    .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.1f), RoundedCornerShape(14.dp))
-                    .background(MaterialTheme.colorScheme.background)
+                    .size(64.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
             ) {
                 AsyncImage(
                     model = product.mainImage,
@@ -770,208 +764,37 @@ fun ProductItemCard(
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
                 )
-                
-                // Overlay for out-of-stock overlay text
-                if (product.stockQuantity == 0) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color.Black.copy(alpha = 0.4f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "اتمام موجودی",
-                            color = Color.White,
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
             }
 
-            Spacer(modifier = Modifier.width(14.dp))
+            Spacer(modifier = Modifier.width(12.dp))
 
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.Center
-            ) {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = product.name,
-                    fontWeight = FontWeight.ExtraBold,
+                    fontWeight = FontWeight.SemiBold,
                     fontSize = 14.sp,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    color = MaterialTheme.colorScheme.onSurface
+                    overflow = TextOverflow.Ellipsis
                 )
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(top = 2.dp)
-                ) {
-                    Text(
-                        text = "SKU: ${product.sku}",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(6.dp))
-
-                // Price display tags with percent discounts
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    if (product.salePrice > 0) {
-                        Text(
-                            text = Helpers.formatPrice(product.salePrice),
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Black,
-                            color = GreenMoney
-                        )
-                        Text(
-                            text = Helpers.formatPrice(product.regularPrice),
-                            fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f),
-                            modifier = Modifier.offset(y = 1.dp),
-                            style = androidx.compose.ui.text.TextStyle(
-                                textDecoration = androidx.compose.ui.text.style.TextDecoration.LineThrough
-                            )
-                        )
-                        
-                        // Small computed discount badge
-                        val pct = ((product.regularPrice - product.salePrice).toDouble() * 100 / product.regularPrice).toInt()
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(RedError.copy(alpha = 0.1f))
-                                .padding(horizontal = 4.dp, vertical = 1.dp)
-                        ) {
-                            Text(
-                                text = "٪$pct-",
-                                color = RedError,
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    } else {
-                        Text(
-                            text = Helpers.formatPrice(product.regularPrice),
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Stock status indicator
-                val stockColor = if (product.stockQuantity == 0) RedError 
-                    else if (product.stockQuantity <= product.lowStockThreshold) YellowWarn 
-                    else GreenMoney
-                
-                val stockText = if (product.stockQuantity == 0) "ناموجود در انبار"
-                    else if (product.stockQuantity <= product.lowStockThreshold) "رو به اتمام (${Helpers.toPersianDigits(product.stockQuantity)} عدد)"
-                    else "موجود در انبار (${Helpers.toPersianDigits(product.stockQuantity)} عدد)"
-
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        // Tiny dot
-                        Box(
-                            modifier = Modifier
-                                .size(6.dp)
-                                .clip(CircleShape)
-                                .background(stockColor)
-                        )
-                        Text(
-                            text = stockText,
-                            color = stockColor,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        
-                        if (product.warehouseNote.isNotBlank()) {
-                            Text(
-                                text = "• ${product.warehouseNote}",
-                                fontSize = 10.sp,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                    }
-                    
-                    Spacer(modifier = Modifier.height(4.dp))
-                    
-                    // Miniature linear resource-meter
-                    val progressFraction = remember(product.stockQuantity) {
-                        if (product.stockQuantity == 0) 0f
-                        else if (product.stockQuantity <= product.lowStockThreshold) 0.35f
-                        else 1.0f
-                    }
-                    LinearProgressIndicator(
-                        progress = { progressFraction },
-                        modifier = Modifier
-                            .fillMaxWidth(0.9f)
-                            .height(3.dp)
-                            .clip(RoundedCornerShape(2.dp)),
-                        color = stockColor,
-                        trackColor = stockColor.copy(alpha = 0.12f)
-                    )
-                }
+                Text(
+                    text = Helpers.formatPrice(product.salePrice.takeIf { it > 0 } ?: product.regularPrice),
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "موجودی: ${product.stockQuantity} عدد",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
             }
 
-            // Quick Operations Column (Pricing, Stock-adjust, and Detailed Editing)
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-                modifier = Modifier
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f))
-                    .padding(horizontal = 4.dp, vertical = 6.dp)
-            ) {
-                // Price adjustment quick button
-                IconButton(
-                    onClick = onPriceChange,
-                    modifier = Modifier.size(34.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.AttachMoney,
-                        contentDescription = "ویرایش سریع قیمت",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp)
-                    )
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                IconButton(onClick = onStockChange, modifier = Modifier.size(36.dp)) {
+                    Icon(Icons.Default.Inventory, contentDescription = null, modifier = Modifier.size(18.dp))
                 }
-
-                // Inventory adjustment quick button
-                IconButton(
-                    onClick = onStockChange,
-                    modifier = Modifier.size(34.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Inventory,
-                        contentDescription = "ویرایش سریع انبار",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(19.dp)
-                    )
-                }
-
-                // Complete full-form edit
-                IconButton(
-                    onClick = onEdit,
-                    modifier = Modifier.size(34.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Edit,
-                        contentDescription = "ویرایش کامل مشخصات",
-                        tint = MaterialTheme.colorScheme.secondary,
-                        modifier = Modifier.size(19.dp)
-                    )
+                IconButton(onClick = onEdit, modifier = Modifier.size(36.dp)) {
+                    Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
                 }
             }
         }

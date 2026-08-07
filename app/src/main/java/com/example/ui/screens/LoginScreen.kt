@@ -262,71 +262,15 @@ fun LoginScreen(
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(32.dp))
+                    Spacer(modifier = Modifier.height(24.dp))
 
-                    // Quick links for Testing different permission structures
                     Text(
-                        text = "جهت بررسی سریع سطوح دسترسی بر روی یکی از نقش‌ها بزنید:",
+                        text = "حالت آزمایشی: admin / admin123",
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                        textAlign = TextAlign.Right,
+                        textAlign = TextAlign.Center,
                         modifier = Modifier.fillMaxWidth()
                     )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        // Super Admin
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.05f))
-                                .clickable {
-                                    username = "admin"
-                                    password = "admin123"
-                                }
-                                .padding(8.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("مدیر اصلی\n(admin)", fontSize = 10.sp, textAlign = TextAlign.Center, fontWeight = FontWeight.SemiBold)
-                        }
-
-                        // Store Admin
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.05f))
-                                .clickable {
-                                    username = "arash_store"
-                                    password = "arash123"
-                                }
-                                .padding(8.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("مدیر فروشگاه\n(arash_store)", fontSize = 10.sp, textAlign = TextAlign.Center, fontWeight = FontWeight.SemiBold)
-                        }
-
-                        // Warehouse Clerk
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.05f))
-                                .clickable {
-                                    username = "sajad_pack"
-                                    password = "sajad123"
-                                }
-                                .padding(8.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("انباردار\n(sajad_pack)", fontSize = 10.sp, textAlign = TextAlign.Center, fontWeight = FontWeight.SemiBold)
-                        }
-                    }
                 } else {
                     // --- TAB II: REAL WOOCOMMERCE CONNECTION RECEIVER ---
 

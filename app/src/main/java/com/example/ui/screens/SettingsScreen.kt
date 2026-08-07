@@ -32,6 +32,7 @@ import com.example.ui.viewmodel.WooViewModel
 @Composable
 fun SettingsScreen(
     viewModel: WooViewModel,
+    onBack: () -> Unit,
     onNavigateToActivities: () -> Unit,
     onNavigateToCoupons: () -> Unit,
     onToggleDarkTheme: (Boolean) -> Unit,
@@ -68,6 +69,29 @@ fun SettingsScreen(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // Top bar
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onBack) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "بازگشت",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "تنظیمات",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+
             // Profile header panel
             Surface(
                 color = MaterialTheme.colorScheme.surface,
