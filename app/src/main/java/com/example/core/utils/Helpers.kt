@@ -30,4 +30,5 @@ object Helpers {
         val formatted = formatter.format(amount)
         return toPersianDigits("$formatted تومان")
     }
+}
 

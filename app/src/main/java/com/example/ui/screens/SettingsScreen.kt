@@ -409,7 +409,6 @@ fun SettingsScreen(
             )
         }
     }
-}
 
 @Composable
 fun SettingCategory(title: String, content: @Composable ColumnScope.() -> Unit) {
