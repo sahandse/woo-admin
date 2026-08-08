@@ -45,4 +45,17 @@ object RetrofitInstance {
         .build()
 
     val wooCommerceApi: WooCommerceApiService = retrofit.create(WooCommerceApiService::class.java)
+
+    // Cached API instance for the current store
+    private var cachedBaseUrl: String? = null
+    private var cachedApi: WooCommerceApiService? = null
+
+    fun getOrCreateWooCommerceApi(baseUrl: String): WooCommerceApiService {
+        val normalizedUrl = if (baseUrl.endsWith("/")) baseUrl else "$baseUrl/"
+        if (cachedBaseUrl != normalizedUrl || cachedApi == null) {
+            cachedBaseUrl = normalizedUrl
+            cachedApi = getRetrofit(normalizedUrl).create(WooCommerceApiService::class.java)
+        }
+        return cachedApi!!
+    }
 }

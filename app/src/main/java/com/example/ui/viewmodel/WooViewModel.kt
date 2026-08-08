@@ -81,6 +81,8 @@ class WooViewModel(application: Application) : AndroidViewModel(application) {
             if (user != null) {
                 _loggedInUser.value = user
                 _isLoggedIn.value = true
+                // Sync data from WooCommerce server on app start
+                repository.syncAllData()
             }
         }
     }
@@ -480,6 +482,11 @@ class WooViewModel(application: Application) : AndroidViewModel(application) {
                 )
                 repository.addNewStore(newStore)
                 
+                // Save credentials for API sync
+                repository.authenticator.storeUrl = storeUrl
+                repository.authenticator.consumerKey = consumerKey
+                repository.authenticator.consumerSecret = consumerSecret
+                
                 // Set as active store
                 // Find default user
                 val usernameVal = "api_admin_${storeName.lowercase().replace(" ", "_").filter { it.isLetterOrDigit() }}"
@@ -513,10 +520,21 @@ class WooViewModel(application: Application) : AndroidViewModel(application) {
                 onProgressUpdate("اتصال با موفقیت برقرار شد!")
                 kotlinx.coroutines.delay(500)
                 
+                // Sync data from WooCommerce server
+                onProgressUpdate("در حال همگام‌سازی داده‌ها با سرور...")
+                repository.syncAllData()
+                
                 onSuccess()
             } catch (e: Exception) {
                 onError("خطا در برقراری ارتباط با وبسایت: ${e.localizedMessage}")
             }
         }
     }
+
+    fun syncAllData() {
+        viewModelScope.launch(Dispatchers.IO) {
+            repository.syncAllData()
+        }
+    }
+
 }

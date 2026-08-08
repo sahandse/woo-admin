@@ -85,7 +85,7 @@ class WooRepository(private val db: AppDatabase, private val context: Context) {
     fun getAllStores(): Flow<List<WooStore>> = db.storeDao().getAllStores()
 
     // --- REMOTE SYNC ---
-    private val authenticator = WooCommerceAuthenticator(context)
+    val authenticator = WooCommerceAuthenticator(context)
 
     suspend fun syncAllData() = withContext(Dispatchers.IO) {
         if (!authenticator.isLoggedIn()) return@withContext
@@ -93,27 +93,28 @@ class WooRepository(private val db: AppDatabase, private val context: Context) {
         try {
             val credential = Credentials.basic(authenticator.consumerKey, authenticator.consumerSecret)
             val baseUrl = authenticator.storeUrl.trimEnd('/')
+            val api = RetrofitInstance.getOrCreateWooCommerceApi(baseUrl)
 
             // Sync orders
-            val ordersResponse = RetrofitInstance.wooCommerceApi.getOrders(credential)
+            val ordersResponse = api.getOrders(credential)
             val localOrders = ordersResponse.map { it.toLocal() }
             db.orderDao().clearAllOrders()
             db.orderDao().insertOrders(localOrders)
 
             // Sync products
-            val productsResponse = RetrofitInstance.wooCommerceApi.getProducts(credential)
+            val productsResponse = api.getProducts(credential)
             val localProducts = productsResponse.map { it.toLocal() }
             db.productDao().clearAllProducts()
             db.productDao().insertProducts(localProducts)
 
             // Sync customers
-            val customersResponse = RetrofitInstance.wooCommerceApi.getCustomers(credential)
+            val customersResponse = api.getCustomers(credential)
             val localCustomers = customersResponse.map { it.toLocal() }
             db.customerDao().clearAllCustomers()
             db.customerDao().insertCustomers(localCustomers)
 
             // Sync coupons
-            val couponsResponse = RetrofitInstance.wooCommerceApi.getCoupons(credential)
+            val couponsResponse = api.getCoupons(credential)
             val localCoupons = couponsResponse.map { it.toLocal() }
             db.couponDao().clearAllCoupons()
             db.couponDao().insertCoupons(localCoupons)
@@ -129,7 +130,9 @@ class WooRepository(private val db: AppDatabase, private val context: Context) {
         if (!authenticator.isLoggedIn()) return@withContext
         try {
             val credential = Credentials.basic(authenticator.consumerKey, authenticator.consumerSecret)
-            val ordersResponse = RetrofitInstance.wooCommerceApi.getOrders(credential)
+            val baseUrl = authenticator.storeUrl.trimEnd('/')
+            val api = RetrofitInstance.getOrCreateWooCommerceApi(baseUrl)
+            val ordersResponse = api.getOrders(credential)
             val localOrders = ordersResponse.map { it.toLocal() }
             db.orderDao().clearAllOrders()
             db.orderDao().insertOrders(localOrders)
@@ -142,7 +145,9 @@ class WooRepository(private val db: AppDatabase, private val context: Context) {
         if (!authenticator.isLoggedIn()) return@withContext
         try {
             val credential = Credentials.basic(authenticator.consumerKey, authenticator.consumerSecret)
-            val productsResponse = RetrofitInstance.wooCommerceApi.getProducts(credential)
+            val baseUrl = authenticator.storeUrl.trimEnd('/')
+            val api = RetrofitInstance.getOrCreateWooCommerceApi(baseUrl)
+            val productsResponse = api.getProducts(credential)
             val localProducts = productsResponse.map { it.toLocal() }
             db.productDao().clearAllProducts()
             db.productDao().insertProducts(localProducts)
