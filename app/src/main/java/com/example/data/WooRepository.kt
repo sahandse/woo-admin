@@ -18,13 +18,8 @@ class WooRepository(private val db: AppDatabase, private val context: Context) {
         get() = sharedPrefs.getBoolean("is_dark_theme_enabled", true)
         set(value) = sharedPrefs.edit().putBoolean("is_dark_theme_enabled", value).apply()
 
-    // Demo Mode toggle: True by default so that they can see a fully populated professional app first.
-    var isDemoMode: Boolean
-        get() = sharedPrefs.getBoolean("is_demo_mode", true)
-        set(value) = sharedPrefs.edit().putBoolean("is_demo_mode", value).apply()
-
     var jwtToken: String
-        get() = sharedPrefs.getString("jwt_token", "demo_jwt_token") ?: "demo_jwt_token"
+        get() = sharedPrefs.getString("jwt_token", "") ?: ""
         set(value) = sharedPrefs.edit().putString("jwt_token", value).apply()
 
     var activeAdminUsername: String
@@ -68,69 +63,6 @@ class WooRepository(private val db: AppDatabase, private val context: Context) {
         get() = sharedPrefs.getString("sms_template_status_completed", "مشتری عزیز {name}، سفارش {order_id} تکمیل و ارسال شد. با تشکر!") ?: "مشتری عزیز {name}، سفارش {order_id} تکمیل و ارسال شد. با تشکر!"
         set(value) = sharedPrefs.edit().putString("sms_template_status_completed", value).apply()
 
-    // Seeds the database with rich Persian details if they don't already exist
-    suspend fun seedDatabase() = withContext(Dispatchers.IO) {
-        try {
-            // Seed stores
-            val stores = db.storeDao().getAllStores().firstOrNull()
-            if (stores.isNullOrEmpty()) {
-                for (store in Helpers.mockStores) {
-                    db.storeDao().insertStore(store)
-                }
-            }
-
-            // Seed products
-            val products = db.productDao().getAllProducts().firstOrNull()
-            if (products.isNullOrEmpty()) {
-                db.productDao().insertProducts(Helpers.mockProducts)
-            }
-
-            // Seed orders
-            val orders = db.orderDao().getAllOrders().firstOrNull()
-            if (orders.isNullOrEmpty()) {
-                db.orderDao().insertOrders(Helpers.mockOrders)
-            }
-
-            // Seed customers
-            val customers = db.customerDao().getAllCustomers().firstOrNull()
-            if (customers.isNullOrEmpty()) {
-                db.customerDao().insertCustomers(Helpers.mockCustomers)
-            }
-
-            // Seed coupons
-            val coupons = db.couponDao().getAllCoupons().firstOrNull()
-            if (coupons.isNullOrEmpty()) {
-                db.couponDao().insertCoupons(Helpers.mockCoupons)
-            }
-
-            // Seed notifications
-            val notifications = db.notificationDao().getAllNotifications().firstOrNull()
-            if (notifications.isNullOrEmpty()) {
-                for (notif in Helpers.mockNotifications) {
-                    db.notificationDao().insertNotification(notif)
-                }
-            }
-
-            // Seed admin users
-            val admins = db.adminUserDao().getAllAdminUsers().firstOrNull()
-            if (admins.isNullOrEmpty()) {
-                for (adm in Helpers.mockAdminUsers) {
-                    db.adminUserDao().insertAdminUser(adm)
-                }
-            }
-
-            // Seed activity logs
-            val activities = db.adminActivityDao().getAllActivities().firstOrNull()
-            if (activities.isNullOrEmpty()) {
-                for (act in Helpers.mockActivities) {
-                    db.adminActivityDao().insertActivity(act)
-                }
-            }
-        } catch (e: Exception) {
-            Log.e("WooRepository", "Failed to seed DB", e)
-        }
-    }
-
     // --- REPLAY CHANNELS AND STREAMS ---
     fun getAllOrders(): Flow<List<WooOrder>> = db.orderDao().getAllOrders()
     fun searchOrders(query: String): Flow<List<WooOrder>> = db.orderDao().searchOrders(query)
@@ -156,7 +88,7 @@ class WooRepository(private val db: AppDatabase, private val context: Context) {
     private val authenticator = WooCommerceAuthenticator(context)
 
     suspend fun syncAllData() = withContext(Dispatchers.IO) {
-        if (!authenticator.isLoggedIn() || isDemoMode) return@withContext
+        if (!authenticator.isLoggedIn()) return@withContext
 
         try {
             val credential = Credentials.basic(authenticator.consumerKey, authenticator.consumerSecret)
@@ -194,7 +126,7 @@ class WooRepository(private val db: AppDatabase, private val context: Context) {
     }
 
     suspend fun syncOrders() = withContext(Dispatchers.IO) {
-        if (!authenticator.isLoggedIn() || isDemoMode) return@withContext
+        if (!authenticator.isLoggedIn()) return@withContext
         try {
             val credential = Credentials.basic(authenticator.consumerKey, authenticator.consumerSecret)
             val ordersResponse = RetrofitInstance.wooCommerceApi.getOrders(credential)
@@ -207,7 +139,7 @@ class WooRepository(private val db: AppDatabase, private val context: Context) {
     }
 
     suspend fun syncProducts() = withContext(Dispatchers.IO) {
-        if (!authenticator.isLoggedIn() || isDemoMode) return@withContext
+        if (!authenticator.isLoggedIn()) return@withContext
         try {
             val credential = Credentials.basic(authenticator.consumerKey, authenticator.consumerSecret)
             val productsResponse = RetrofitInstance.wooCommerceApi.getProducts(credential)
@@ -395,10 +327,8 @@ class WooRepository(private val db: AppDatabase, private val context: Context) {
         val password = melipayamakPassword
         val sender = melipayamakSender
 
-        if (isDemoMode || username.isBlank() || password.isBlank()) {
-            val simulationMsg = "شبیه‌سازی ارسال پیامک به $recipientPhone: $messageText"
-            logActivity("SEND_SMS", "شبیه‌سازی ملی‌پیامک: ارسال پیامک به $recipientPhone انجام شد. (متن: $messageText)")
-            return@withContext com.example.core.network.SmsResult.Success("حالت آزمایشی فعال است. پیامک ارسال و ثبت شد.", simulationMsg)
+        if (username.isBlank() || password.isBlank()) {
+            return@withContext com.example.core.network.SmsResult.Error("مشخصات ملی‌پیامک تنظیم نشده است.")
         }
 
         val result = com.example.core.network.MeliPayamakService.sendSms(username, password, recipientPhone, sender, messageText)

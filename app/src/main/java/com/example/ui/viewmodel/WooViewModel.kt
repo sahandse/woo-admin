@@ -75,9 +75,6 @@ class WooViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         viewModelScope.launch(Dispatchers.IO) {
-            // Seed database to ensure it's loaded with rich initial data
-            repository.seedDatabase()
-            
             // Log in default user from preference
             val username = repository.activeAdminUsername
             val user = db.adminUserDao().getAdminUserByUsername(username)
